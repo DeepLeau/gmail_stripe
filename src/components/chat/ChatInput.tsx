@@ -8,9 +8,18 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
+  placeholder?: string
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  disabled: disabledProp = false,
+  placeholder = 'Pose une question...',
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
