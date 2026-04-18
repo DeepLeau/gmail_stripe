@@ -10,6 +10,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Question history** — Review all your past questions and answers
 - **Gmail & Outlook integration** — Connect your inbox in one click
 - **Secure data handling** — Encrypted storage, no data resale, revocable access
+- **AI Chat Interface** — Clean, modern chat experience at `/chat` with typing indicators and auto-scroll
 
 ## 🛠️ Tech Stack
 
@@ -66,6 +67,10 @@ After a few seconds, you'll see:
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the landing page.
 
+### 4. Try the AI Chat
+
+Visit [http://localhost:3000/chat](http://localhost:3000/chat) to experience the new chat interface. Type a message and press Enter or click the send button to see the mock AI response.
+
 ## 📁 Project Structure
 
 ```
@@ -74,61 +79,63 @@ my-app/
 │   ├── app/                    # Next.js App Router — pages and layout
 │   │   ├── globals.css         # Global styles and Tailwind imports
 │   │   ├── layout.tsx          # Root layout (fonts, metadata)
-│   │   └── page.tsx           # Home page — assembles all sections
+│   │   ├── page.tsx           # Home page — landing page
+│   │   └── chat/
+│   │       └── page.tsx       # AI Chat page at /chat
 │   ├── components/
 │   │   ├── ui/                # Reusable UI components
 │   │   │   ├── Navbar.tsx     # Top navigation bar
 │   │   │   └── Footer.tsx     # Page footer
-│   │   └── sections/          # Landing page sections
-│   │       ├── Hero.tsx       # Hero with headline and CTA
-│   │       ├── QuestionExamples.tsx  # Example questions showcase
-│   │       ├── HowItWorks.tsx # 3-step explanation
-│   │       ├── Features.tsx   # Feature cards grid
-│   │       ├── TrustSecurity.tsx  # Security & trust badges
-│   │       ├── Pricing.tsx    # Free vs Pro pricing
-│   │       └── FinalCTA.tsx  # Final call-to-action
+│   │   ├── sections/          # Landing page sections
+│   │   │   ├── Hero.tsx       # Hero with headline and CTA
+│   │   │   ├── QuestionExamples.tsx  # Example questions showcase
+│   │   │   ├── HowItWorks.tsx # 3-step explanation
+│   │   │   ├── Features.tsx   # Feature cards grid
+│   │   │   ├── TrustSecurity.tsx  # Security & trust badges
+│   │   │   ├── Pricing.tsx    # Free vs Pro pricing
+│   │   │   └── FinalCTA.tsx  # Final call-to-action
+│   │   └── chat/              # Chat interface components
+│   │       ├── ChatInterface.tsx  # Main chat container
+│   │       ├── ChatMessage.tsx    # Individual message bubble
+│   │       ├── ChatInput.tsx      # Auto-expanding text input
+│   │       └── TypingIndicator.tsx # Three-dot loading animation
 │   └── lib/
 │       ├── utils.ts           # Utility functions (cn helper)
-│       └── data.ts            # Static data (questions, features)
-├── public/                    # Static assets (images, fonts)
-├── next.config.mjs           # Next.js configuration
-├── tailwind.config.ts        # Tailwind CSS configuration
-├── postcss.config.js         # PostCSS configuration
-└── tsconfig.json             # TypeScript configuration
+│       ├── data.ts            # Static data (questions, features)
+│       └── chat/
+│           ├── types.ts       # Chat message type definitions
+│           ├── responses.ts   # Mock AI response pool
+│           └── mockApi.ts     # Mock API with random response delay
 ```
+
+## 🤖 Chat Feature Architecture
+
+The `/chat` page uses a mock API system designed for easy replacement with a real API later:
+
+| File | Purpose |
+|------|---------|
+| `src/lib/chat/types.ts` | TypeScript interfaces for messages |
+| `src/lib/chat/responses.ts` | Pool of generic AI responses |
+| `src/lib/chat/mockApi.ts` | Mock API function (replace with real API call) |
+| `src/components/chat/` | UI components for the chat interface |
+
+To connect a real AI API later, simply update the `sendMessage` function in `ChatInterface.tsx` to call your API endpoint instead of `mockApi.sendMessage()`.
 
 ## 🚀 Deploy to Vercel
 
-Vercel is the easiest way to deploy a Next.js application.
-
-### One-click deploy
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-### Step by step
+### Step by step:
 
-1. **Import your repository**
-   - Click "Import Project" on Vercel
-   - Select your GitHub repository
-   - Vercel will auto-detect it's a Next.js project
+1. **Import your repository** — Click "Import Project" on Vercel, select your GitHub repo
+2. **Configure project** — Vercel auto-detects Next.js settings (no changes needed)
+3. **Add environment variables** — If you add any later (e.g., API keys), add them in Vercel > Settings > Environment Variables
+4. **Deploy** — Click "Deploy" and wait ~1 minute
 
-2. **Configure your project**
-   - Framework Preset: Next.js (auto-selected)
-   - Root Directory: `./` (default)
-   - Build Command: `npm run build` (default)
-   - Output Directory: `.next` (default)
+Your app will be live at `https://your-project.vercel.app` with the chat available at `/chat`.
 
-3. **Deploy**
-   - Click "Deploy"
-   - Wait 1-2 minutes for the build
-   - Your site is live at `https://your-project.vercel.app`
-
-No environment variables are required for this landing page.
+> 💡 **Tip**: After deploying, test the `/chat` page to ensure the chat interface works correctly in production.
 
 ## 📝 License
 
 MIT
-
----
-
-Built with care for people who deserve better than searching through 10,000 emails.
