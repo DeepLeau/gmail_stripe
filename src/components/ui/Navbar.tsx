@@ -35,7 +35,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-14 gap-10">
           {/* Logo */}
           <a
-            href="#"
+            href="/"
             className="flex items-center gap-2 font-semibold text-[var(--accent)] text-lg tracking-tight flex-shrink-0"
           >
             Emind
@@ -57,13 +57,13 @@ export function Navbar() {
           {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-2 flex-shrink-0">
             <a
-              href="#"
+              href="/login"
               className="h-8 px-3 flex items-center justify-center text-sm text-[var(--text-2)] hover:text-[var(--text)] transition-colors duration-150 rounded-md border border-transparent hover:border-[var(--border)]"
             >
               Se connecter
             </a>
             <a
-              href="#pricing"
+              href="/signup"
               className="h-9 px-4 flex items-center justify-center rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors duration-150 shadow-sm gap-1.5"
             >
               Commencer
@@ -114,13 +114,13 @@ export function Navbar() {
             ))}
             <div className="pt-3 border-t border-[var(--border)] mt-2 flex flex-col gap-2">
               <a
-                href="#"
+                href="/login"
                 className="px-4 py-2.5 text-sm text-center text-[var(--text-2)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface)] transition-colors"
               >
                 Se connecter
               </a>
               <a
-                href="#pricing"
+                href="/signup"
                 onClick={() => setMenuOpen(false)}
                 className="px-4 py-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors"
               >
