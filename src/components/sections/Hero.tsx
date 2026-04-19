@@ -1,467 +1,370 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { ArrowRight, PlayCircle } from 'lucide-react'
+import { ArrowRight, Mail, Search, MessageCircle, Zap, Shield } from 'lucide-react'
+import { cn } from '@/lib/utils'
+
+// Chat mock data for the hero
+const chatMessages = [
+  {
+    id: 1,
+    type: 'question' as const,
+    text: "Qui m'a relancé cette semaine ?",
+    time: 'il y a 2 min',
+  },
+  {
+    id: 2,
+    type: 'answer' as const,
+    text: 'Marc Dubois — 2 relances, Sophie Martin — 1 relance.',
+    time: '',
+  },
+  {
+    id: 3,
+    type: 'question' as const,
+    text: 'Résume mes échanges avec Marc sur le projet X.',
+    time: 'maintenant',
+  },
+  {
+    id: 4,
+    type: 'answer' as const,
+    text: 'Fil de 12 emails. En cours depuis 2 semaines. Prochaine étape : validation du budget.',
+    time: '',
+  },
+]
+
+// Animated counter
+function AnimatedCounter({
+  target,
+  suffix = '',
+}: {
+  target: number
+  suffix?: string
+}) {
+  const [value, setValue] = useState(0)
+  const ref = useRef<HTMLSpanElement>(null)
+  const started = useRef(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !started.current) {
+          started.current = true
+          const duration = 1800
+          const startTime = performance.now()
+
+          const step = (now: number) => {
+            const progress = Math.min((now - startTime) / duration, 1)
+            const ease = 1 - Math.pow(1 - progress, 3)
+            setValue(Math.floor(target * ease))
+            if (progress < 1) requestAnimationFrame(step)
+            else setValue(target)
+          }
+          requestAnimationFrame(step)
+        }
+      },
+      { threshold: 0.5 }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [target])
+
+  return (
+    <span ref={ref}>
+      {value.toLocaleString()}
+      {suffix}
+    </span>
+  )
+}
+
+// Chat bubble component
+function ChatBubble({
+  message,
+  visible,
+  index,
+}: {
+  message: (typeof chatMessages)[0]
+  visible: boolean
+  index: number
+}) {
+  const isQuestion = message.type === 'question'
+
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-1 transition-all duration-500',
+        isQuestion ? 'items-end' : 'items-start',
+        visible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3'
+      )}
+      style={{ transitionDelay: `${index * 400}ms` }}
+    >
+      {/* Tail */}
+      {isQuestion ? (
+        <div className="w-0 h-0 border-l-[8px] border-l-[var(--accent-light)] border-r-[8px] border-r-transparent border-t-[8px] border-t-transparent self-end mr-3" />
+      ) : (
+        <div className="w-0 h-0 border-l-[8px] border-l-transparent border-r-[8px] border-r-[var(--border)] border-t-[8px] border-t-transparent self-start ml-3" />
+      )}
+
+      <div
+        className={cn(
+          'rounded-2xl px-4 py-2.5 max-w-[85%]',
+          isQuestion
+            ? 'bg-[var(--accent-light)] text-[var(--accent-light-text)] rounded-br-md'
+            : 'bg-white border border-[var(--border)] text-[var(--text)] rounded-bl-md'
+        )}
+      >
+        <p className="text-sm leading-relaxed">{message.text}</p>
+      </div>
+
+      {isQuestion && message.time && (
+        <span className="text-[10px] text-[var(--text-3)] px-1 self-end mr-1">
+          {message.time}
+        </span>
+      )}
+    </div>
+  )
+}
 
 export function Hero() {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [chatVisible, setChatVisible] = useState(false)
+  const [statsVisible, setStatsVisible] = useState(false)
+  const [contentVisible, setContentVisible] = useState(false)
+
   const heroRef = useRef<HTMLElement>(null)
-  const [visible, setVisible] = useState(false)
+  const chatRef = useRef<HTMLDivElement>(null)
+  const statsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    setVisible(true)
-  }, [])
-
-  // Hero canvas particle network
-  useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    if (window.innerWidth < 768) return
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    let width = canvas.width
-    let height = canvas.height
-    const section = heroRef.current
-    if (!section) return
-
-    const resize = () => {
-      width = canvas.width = window.innerWidth
-      height = canvas.height = section.offsetHeight
-    }
-    resize()
-    window.addEventListener('resize', resize)
-
-    const particleCount = window.innerWidth > 1400 ? 250 : 150
-    interface Particle {
-      x: number
-      y: number
-      vx: number
-      vy: number
-      baseX: number
-      baseY: number
-    }
-    const particles: Particle[] = []
-    for (let i = 0; i < particleCount; i++) {
-      const p: Particle = {
-        x: Math.random() * width,
-        y: Math.random() * height,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: (Math.random() - 0.5) * 0.25,
-        baseX: 0,
-        baseY: 0,
-      }
-      p.baseX = p.x
-      p.baseY = p.y
-      particles.push(p)
-    }
-
-    let mouseX = -1000
-    let mouseY = -1000
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect()
-      mouseX = e.clientX - rect.left
-      mouseY = e.clientY - rect.top
-    }
-    const handleMouseLeave = () => {
-      mouseX = -1000
-      mouseY = -1000
-    }
-    canvas.addEventListener('mousemove', handleMouseMove)
-    canvas.addEventListener('mouseleave', handleMouseLeave)
-
-    let animId: number
-    const draw = () => {
-      ctx.clearRect(0, 0, width, height)
-
-      for (let i = 0; i < particleCount; i++) {
-        const p = particles[i]
-        p.x += p.vx
-        p.y += p.vy
-        if (p.x < 0 || p.x > width) p.vx *= -1
-        if (p.y < 0 || p.y > height) p.vy *= -1
-
-        const dx = mouseX - p.x
-        const dy = mouseY - p.y
-        const dist = Math.sqrt(dx * dx + dy * dy)
-        if (dist < 120) {
-          p.x -= dx * 0.03
-          p.y -= dy * 0.03
-        }
-
-        ctx.fillStyle = 'rgba(14, 15, 17, 0.35)'
-        ctx.beginPath()
-        ctx.arc(p.x, p.y, 1.2, 0, Math.PI * 2)
-        ctx.fill()
-
-        for (let j = i + 1; j < particleCount; j++) {
-          const p2 = particles[j]
-          const d2x = p.x - p2.x
-          const d2y = p.y - p2.y
-          const dist2 = Math.sqrt(d2x * d2x + d2y * d2y)
-          if (dist2 < 85) {
-            ctx.beginPath()
-            ctx.strokeStyle = `rgba(232, 160, 32, ${0.1 * (1 - dist2 / 85)})`
-            ctx.lineWidth = 0.6
-            ctx.moveTo(p.x, p.y)
-            ctx.lineTo(p2.x, p2.y)
-            ctx.stroke()
-          }
-        }
-      }
-      animId = requestAnimationFrame(draw)
-    }
-    draw()
+    // Animate content first
+    const t1 = setTimeout(() => setContentVisible(true), 200)
+    // Then chat
+    const t2 = setTimeout(() => setChatVisible(true), 800)
+    // Then stats
+    const t3 = setTimeout(() => setStatsVisible(true), 1200)
 
     return () => {
-      window.removeEventListener('resize', resize)
-      canvas.removeEventListener('mousemove', handleMouseMove)
-      canvas.removeEventListener('mouseleave', handleMouseLeave)
-      cancelAnimationFrame(animId)
+      clearTimeout(t1)
+      clearTimeout(t2)
+      clearTimeout(t3)
     }
   }, [])
 
   return (
-    <>
-      {/* Noise overlay */}
-      <div className="noise-overlay" />
+    <section
+      ref={heroRef}
+      className="relative min-h-screen flex flex-col items-center justify-center overflow-hidden pt-14"
+      style={{ background: 'var(--bg)' }}
+    >
+      {/* Background orbs */}
+      <div className="orb orb--1" />
+      <div className="orb orb--2" />
 
-      {/* Hero section */}
-      <section
-        ref={heroRef}
-        className="relative min-h-[90vh] pt-[120px] pb-section px-container overflow-hidden flex items-end w-full"
-        style={{ paddingTop: 'clamp(7.5rem, 12vw, 10rem)', paddingBottom: 'clamp(5.5rem, 9vw, 11rem)' }}
-      >
-        {/* Canvas background */}
-        <canvas
-          id="hero-canvas"
-          ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full z-0 pointer-events-none opacity-[0.85] mix-blend-multiply hidden md:block"
-        />
-        <div
-          className="absolute inset-0 z-0 pointer-events-none md:hidden"
-          style={{
-            background: 'radial-gradient(circle_at_30%_70%, rgba(232,160,32,0.06) 0%, transparent 60%)',
-          }}
-        />
+      {/* Subtle radial glow */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            'radial-gradient(ellipse 80% 50% at 30% 40%, rgba(59,130,246,0.06) 0%, transparent 60%), radial-gradient(ellipse 60% 40% at 70% 60%, rgba(139,92,246,0.05) 0%, transparent 50%), radial-gradient(ellipse 50% 35% at 50% 30%, rgba(59,130,246,0.04) 0%, transparent 55%)',
+        }}
+      />
 
-        {/* Hero sweep line */}
-        <div className="absolute top-0 left-0 w-[1px] h-full bg-amber opacity-0 z-10 animate-sweep pointer-events-none" />
-
-        {/* Content grid */}
-        <div
-          className="w-full max-w-[96rem] mx-auto grid grid-cols-1 md:grid-cols-12 gap-8 relative z-10 items-end"
-          style={{ maxWidth: 'clamp(70rem, 92vw, 96rem)' }}
-        >
-          {/* Left column (5/12) */}
-          <div
-            className={`md:col-span-5 flex flex-col justify-end pb-8 reveal-up ${visible ? 'is-visible' : ''}`}
-            style={{ transitionDelay: '0ms' }}
-          >
+      <div className="relative z-10 max-w-6xl mx-auto px-6 py-24 w-full">
+        <div className="flex flex-col lg:flex-row items-center gap-16">
+          {/* Left: Content */}
+          <div className="flex-1 flex flex-col items-center lg:items-start text-center lg:text-left">
             {/* Badge */}
-            <div className="mb-4">
-              <span
-                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border border-amber/30 text-amber font-mono text-xs uppercase tracking-widest"
-                style={{ backgroundColor: 'rgba(232, 160, 32, 0.08)' }}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-amber animate-pulse" />
-                3 plans au choix
+            <div
+              className={cn(
+                'inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[var(--accent)]/20 bg-[var(--accent-light)] mb-6 transition-all duration-700',
+                contentVisible
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-4'
+              )}
+              style={{ animation: contentVisible ? 'badge-glow 3s ease-in-out infinite' : undefined }}
+            >
+              <div className="glow-dot" />
+              <span className="text-xs font-medium text-[var(--accent)]">
+                Nouveau — connecté à Gmail & Outlook
               </span>
             </div>
 
             {/* Title */}
             <h1
-              className="font-display font-light text-h1 leading-[1.05] tracking-tight text-graphite-900 mb-6 text-balance"
-              style={{ fontFamily: 'var(--font-display)', fontSize: 'clamp(2.75rem, 5.5vw, 5.25rem)' }}
+              className={cn(
+                'text-4xl sm:text-5xl lg:text-6xl font-light tracking-[-0.03em] leading-[1.06] mb-6 w-full transition-all duration-700',
+                contentVisible
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-6'
+              )}
             >
-              Choose your plan.
-              <br />
-              <span className="font-normal text-amber">Chat away.</span>
+              <span className="block text-[var(--text)]">
+                Toutes les réponses
+              </span>
+              <span className="block text-[var(--accent)] mt-1">
+                sont dans ta boîte mail.
+              </span>
             </h1>
 
             {/* Subtitle */}
             <p
-              className="font-body text-graphite-500 max-w-[42ch] mb-10 leading-relaxed text-sm md:text-base"
-              style={{ fontFamily: 'var(--font-body)', color: 'var(--graphite-500)', maxWidth: '42ch' }}
+              className={cn(
+                'text-base sm:text-lg text-[var(--text-2)] leading-relaxed mb-8 max-w-lg transition-all duration-700 delay-100',
+                contentVisible
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-6'
+              )}
             >
-              MessageMind vous donne le quota de messages qu&apos;il vous faut — facturé mensuellement, upgradable à tout moment, résiliable quand vous voulez.
+              Emind connecte tes emails à une IA. Pose une question en
+              langage naturel, obtiens une réponse précise avec les sources.
             </p>
 
             {/* CTAs */}
-            <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center mb-12">
+            <div
+              className={cn(
+                'flex flex-col sm:flex-row gap-3 w-full sm:w-auto mb-10 transition-all duration-700 delay-200',
+                contentVisible
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-6'
+              )}
+            >
               <a
-                href="#pricing"
-                className="relative inline-flex items-center justify-center px-8 py-4 font-mono text-xs font-semibold uppercase tracking-[0.1em] text-surface bg-gradient-to-b from-graphite-800 to-graphite-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_4px_20px_rgba(14,15,17,0.2)] group hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_8px_32px_rgba(14,15,17,0.3)] transition-all duration-300 hover:-translate-y-0.5 overflow-hidden"
-                style={{ fontFamily: 'var(--font-mono)' }}
+                href="#"
+                className="btn-hero-primary"
               >
-                <span className="relative z-10 flex items-center gap-2">
-                  Voir les tarifs
-                  <ArrowRight size={16} strokeWidth={1.5} className="transition-transform group-hover:translate-x-1" />
-                </span>
-                <div className="absolute inset-0 bg-white/5 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-swiss" />
+                Connecter ma boîte mail
+                <ArrowRight size={16} strokeWidth={1.5} />
               </a>
               <a
-                href="#workflow"
-                className="inline-flex items-center justify-center px-8 py-4 font-mono text-xs font-medium uppercase tracking-[0.1em] text-graphite-900 bg-surface border border-graphite-900/10 shadow-[0_2px_10px_rgba(14,15,17,0.02)] hover:shadow-[0_8px_24px_rgba(14,15,17,0.06)] hover:border-graphite-900/20 transition-all duration-300 hover:-translate-y-0.5 group"
-                style={{ fontFamily: 'var(--font-mono)' }}
+                href="#examples"
+                className="btn-hero-ghost"
               >
-                Comment ça marche
-                <PlayCircle size={16} strokeWidth={1.5} className="ml-2 text-graphite-500 group-hover:text-amber transition-colors" />
+                Voir une démo
+                <ArrowRight size={16} strokeWidth={1.5} />
               </a>
             </div>
 
-            {/* Social proof */}
-            <div className="flex items-center gap-4 border-t border-graphite-900/10 pt-6">
-              <div className="flex -space-x-2">
+            {/* Stats strip */}
+            <div
+              ref={statsRef}
+              className={cn(
+                'flex flex-wrap gap-px rounded-2xl overflow-hidden border border-[var(--border)] transition-all duration-700 delay-300',
+                statsVisible
+                  ? 'opacity-100 translate-y-0'
+                  : 'opacity-0 translate-y-4'
+              )}
+            >
+              {[
+                { value: '50k+', label: 'Emails indexés' },
+                { value: '<2s', label: 'Temps de réponse' },
+                { value: '100%', label: 'Chiffré de bout en bout' },
+                { value: '12k+', label: 'Utilisateurs actifs' },
+              ].map((stat, i) => (
                 <div
-                  className="w-8 h-8 rounded-none bg-graphite-500 border border-canvas shadow-sm"
-                  style={{ backgroundColor: 'var(--graphite-500)' }}
-                />
-                <div
-                  className="w-8 h-8 rounded-none bg-graphite-900 border border-canvas shadow-sm"
-                  style={{ backgroundColor: 'var(--graphite-900)' }}
-                />
-                <div
-                  className="w-8 h-8 rounded-none bg-amber border border-canvas shadow-sm"
-                  style={{ backgroundColor: 'var(--amber)' }}
-                />
-              </div>
-              <p
-                className="font-mono text-xs tracking-[0.06em] text-graphite-500 uppercase leading-tight max-w-[200px]"
-                style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-              >
-                Utilisé par{' '}
-                <span className="text-graphite-900 font-semibold">340</span> équipes.
-                <br />
-                <span className="text-graphite-900 font-semibold">91k+</span> messages ce mois.
-              </p>
+                  key={stat.label}
+                  className="flex-1 min-w-[120px] px-4 py-3 bg-[var(--surface)] flex flex-col items-center sm:items-start gap-0.5"
+                  style={{ animationDelay: `${i * 150}ms` }}
+                >
+                  <div className="text-base sm:text-lg font-bold text-[var(--text)] tracking-tight">
+                    {stat.value}
+                  </div>
+                  <div className="text-[10px] text-[var(--text-3)] uppercase tracking-widest font-mono">
+                    {stat.label}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 
-          {/* Right column (7/12) — Dashboard mockup */}
+          {/* Right: Chat mockup */}
           <div
-            className={`md:col-span-7 relative md:-ml-6 reveal-up ${visible ? 'is-visible' : ''}`}
-            style={{ transitionDelay: '200ms' }}
-            id="hero-panel"
+            ref={chatRef}
+            className={cn(
+              'w-full max-w-md flex-shrink-0 transition-all duration-700 delay-200',
+              chatVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-8'
+            )}
           >
-            <div
-              className="bg-surface border border-graphite-900/10 shadow-[0_24px_80px_rgba(14,15,17,0.08)] overflow-hidden relative group"
-              style={{ borderRadius: '0' }}
-            >
-              {/* Dashboard header */}
-              <div
-                className="border-b border-graphite-900/10 px-6 py-4 flex justify-between items-center"
-                style={{ backgroundColor: 'rgba(246, 244, 240, 0.5)' }}
-              >
-                <div className="flex items-center gap-6">
-                  <span
-                    className="font-display font-semibold text-sm uppercase tracking-tight text-graphite-900"
-                    style={{ fontFamily: 'var(--font-display)' }}
-                  >
-                    MessageMind
-                  </span>
-                  <div className="hidden sm:flex items-center gap-4">
-                    <span
-                      className="font-mono text-xs tracking-[0.1em] text-graphite-900 uppercase flex items-center gap-1"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--amber)' }} />
-                      Conversations
-                    </span>
-                    <span
-                      className="font-mono text-xs tracking-[0.1em] text-graphite-500 uppercase hover:text-graphite-900 cursor-pointer transition-colors"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      Insights
-                    </span>
-                    <span
-                      className="font-mono text-xs tracking-[0.1em] text-graphite-500 uppercase hover:text-graphite-900 cursor-pointer transition-colors"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      Quotas
-                    </span>
-                  </div>
+            {/* Chat window */}
+            <div className="rounded-2xl border border-[var(--border)] bg-white shadow-[0_8px_40px_rgba(0,0,0,0.08),0_0_1px_rgba(0,0,0,0.04)] overflow-hidden">
+              {/* Top bar */}
+              <div className="px-4 py-3 border-b border-[var(--border)] flex items-center gap-2 bg-[var(--surface)]">
+                <div className="flex gap-1.5">
+                  <div className="w-3 h-3 rounded-full bg-red-400" />
+                  <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                  <div className="w-3 h-3 rounded-full bg-green-400" />
                 </div>
-                <div className="flex items-center gap-4">
-                  {/* Bell icon */}
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-graphite-500 hover:text-graphite-900 transition-colors cursor-pointer">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                  <div className="flex items-center gap-2 border-l border-graphite-900/10 pl-4">
-                    <div
-                      className="w-6 h-6 flex items-center justify-center font-mono text-xs text-canvas"
-                      style={{ backgroundColor: 'var(--graphite-900)', fontFamily: 'var(--font-mono)' }}
-                    >
-                      MM
-                    </div>
-                    <span
-                      className="font-mono text-xs text-graphite-500 hidden sm:block"
-                      style={{ fontFamily: 'var(--font-mono)' }}
-                    >
-                      Marie Martin, Scale
-                    </span>
-                  </div>
+                <div className="flex items-center gap-1.5 ml-2">
+                  <Mail size={12} className="text-[var(--accent)]" strokeWidth={1.5} />
+                  <span className="text-xs text-[var(--text-2)] font-mono">
+                    Emind — conversation
+                  </span>
+                </div>
+                <div className="ml-auto flex items-center gap-1">
+                  <div
+                    className="w-1.5 h-1.5 rounded-full bg-green-500"
+                    style={{ animation: 'pulse-dot 2s ease-in-out infinite' }}
+                  />
+                  <span className="text-[10px] text-[var(--accent)] font-mono">
+                    EN LIGNE
+                  </span>
                 </div>
               </div>
 
-              {/* Dashboard content */}
-              <div className="p-6 bg-surface">
-                {/* Top bar */}
-                <div className="flex justify-between items-end mb-8">
-                  <div>
-                    <h3
-                      className="font-display font-normal text-lg mb-1"
-                      style={{ fontFamily: 'var(--font-display)' }}
-                    >
-                      Vos conversations
-                    </h3>
-                    <div className="flex items-center gap-2">
-                      <span
-                        className="font-mono text-xs border border-graphite-900/10 px-2 py-0.5"
-                        style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-                      >
-                        Nov 2025
-                      </span>
-                      <span
-                        className="font-mono text-xs px-2 py-0.5"
-                        style={{ backgroundColor: 'rgba(16, 185, 129, 0.1)', color: 'var(--green)' }}
-                      >
-                        +12 ce mois
-                      </span>
-                    </div>
-                  </div>
-                  <div className="text-right group-hover:-translate-y-0.5 transition-transform duration-300">
-                    <span
-                      className="block font-mono text-xs mb-1 uppercase tracking-[0.06em]"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-                    >
-                      Messages utilisés
-                    </span>
-                    <span
-                      className="font-mono text-2xl font-medium group-hover:text-amber transition-colors"
-                      style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-900)' }}
-                    >
-                      47 / 50
-                    </span>
-                  </div>
-                </div>
-
-                {/* Spark cards grid */}
-                <div className="grid grid-cols-2 gap-4 mb-8">
-                  {/* Card 1 */}
-                  <div
-                    className="border border-graphite-900/10 p-4 hover:border-amber/40 transition-colors cursor-pointer group flex justify-between items-start"
-                    style={{ borderColor: 'var(--graphite-900)' }}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-graphite-500">
-                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                        </svg>
-                        <span className="font-display font-medium text-sm" style={{ fontFamily: 'var(--font-display)' }}>Conversations</span>
-                      </div>
-                      <span className="font-mono text-xs uppercase" style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}>
-                        Ce mois
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono text-xs mb-2 block" style={{ color: 'var(--green)' }}>↑ 23%</span>
-                      <span className="font-mono text-sm font-medium group-hover:text-amber transition-colors" style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-900)' }}>
-                        128
-                      </span>
-                    </div>
-                  </div>
-                  {/* Card 2 */}
-                  <div
-                    className="border border-graphite-900/10 p-4 hover:border-amber/40 transition-colors cursor-pointer group flex justify-between items-start"
-                    style={{ borderColor: 'var(--graphite-900)' }}
-                  >
-                    <div>
-                      <div className="flex items-center gap-2 mb-4">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-graphite-500">
-                          <circle cx="12" cy="12" r="10" />
-                          <polyline points="12 6 12 12 16 14" />
-                        </svg>
-                        <span className="font-display font-medium text-sm" style={{ fontFamily: 'var(--font-display)' }}>Temps moyen</span>
-                      </div>
-                      <span className="font-mono text-xs uppercase" style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}>
-                        Réponse IA
-                      </span>
-                    </div>
-                    <div className="text-right">
-                      <span className="font-mono text-xs mb-2 block" style={{ color: 'var(--green)' }}>↓ 8%</span>
-                      <span className="font-mono text-sm font-medium group-hover:text-amber transition-colors" style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-900)' }}>
-                        2.4s
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Conversation list */}
-                <div>
-                  <span
-                    className="font-mono text-xs uppercase tracking-[0.1em] border-b border-graphite-900/10 pb-2 block w-full mb-2"
-                    style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-                  >
-                    Messages récents
-                  </span>
-                  <div className="space-y-1">
-                    {[
-                      { dot: 'var(--green)', name: 'Sophie L.', preview: 'Projet Q4 — confirmation...', time: '14:32', tag: 'Résolu' },
-                      { dot: 'var(--amber)', name: 'Thomas B.', preview: 'Question sur le plan Scale', time: '13:15', tag: 'En cours' },
-                      { dot: 'var(--red)', name: 'Julie M.', preview: 'Problème de facturation', time: '11:48', tag: 'Urgent' },
-                    ].map((item, i) => (
-                      <div key={i} className="flex justify-between items-center py-2 px-2 hover:bg-canvas transition-colors text-xs">
-                        <div className="flex items-center gap-3">
-                          <div className="w-1.5 h-1.5 rounded-none" style={{ backgroundColor: item.dot }} />
-                          <span className="font-medium min-w-[120px]">{item.name}</span>
-                          <span
-                            className="font-mono text-xs hidden sm:inline-block border border-graphite-900/10 px-1"
-                            style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-                          >
-                            {item.tag}
-                          </span>
-                        </div>
-                        <span
-                          className="font-mono text-xs"
-                          style={{ fontFamily: 'var(--font-mono)', color: 'var(--graphite-500)' }}
-                        >
-                          {item.time}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+              {/* Chat messages */}
+              <div className="p-5 flex flex-col gap-4 min-h-[340px] max-h-[400px] overflow-y-auto">
+                {chatMessages.map((msg, i) => (
+                  <ChatBubble
+                    key={msg.id}
+                    message={msg}
+                    visible={chatVisible}
+                    index={i}
+                  />
+                ))}
               </div>
 
-              {/* Status bar */}
-              <div
-                className="py-2 px-6 flex justify-between items-center"
-                style={{ backgroundColor: 'var(--graphite-900)' }}
-              >
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-none animate-pulse" style={{ backgroundColor: 'var(--green)' }} />
-                  <span
-                    className="font-mono text-xs uppercase tracking-[0.1em]"
-                    style={{ fontFamily: 'var(--font-mono)', color: 'rgba(246, 244, 240, 0.7)' }}
-                  >
-                    Connecté à Stripe · Quota: 47/50
+              {/* Input bar */}
+              <div className="px-4 py-3 border-t border-[var(--border)] bg-[var(--surface)] flex items-center gap-2">
+                <div className="w-full bg-white border border-[var(--border)] rounded-lg px-3 py-2 flex items-center gap-2">
+                  <Search size={13} className="text-[var(--text-3)] flex-shrink-0" strokeWidth={1.5} />
+                  <span className="text-xs text-[var(--text-3)]">
+                    Pose ta question à Emind...
                   </span>
                 </div>
-                <span
-                  className="font-mono text-xs uppercase tracking-[0.1em]"
-                  style={{ fontFamily: 'var(--font-mono)', color: 'rgba(246, 244, 240, 0.5)' }}
+                <div className="w-8 h-8 rounded-lg bg-[var(--accent)] flex items-center justify-center flex-shrink-0">
+                  <Zap size={14} className="text-white" strokeWidth={2} />
+                </div>
+              </div>
+            </div>
+
+            {/* Floating mini metrics */}
+            <div className="mt-4 flex gap-3">
+              {[
+                { icon: Mail, label: 'Gmail & Outlook' },
+                { icon: Shield, label: 'OAuth sécurisé' },
+                { icon: MessageCircle, label: 'Réponses sourcées' },
+              ].map(({ icon: Icon, label }) => (
+                <div
+                  key={label}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-[var(--border)] bg-white text-[10px] text-[var(--text-2)]"
                 >
-                  Synced: 14s ago
-                </span>
-              </div>
+                  <Icon size={11} strokeWidth={1.5} className="text-[var(--accent)]" />
+                  {label}
+                </div>
+              ))}
             </div>
           </div>
         </div>
-      </section>
-    </>
+      </div>
+
+      {/* Bottom gradient fade */}
+      <div
+        className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none"
+        style={{
+          background:
+            'linear-gradient(to top, var(--bg) 0%, transparent 100%)',
+        }}
+      />
+    </section>
   )
 }

@@ -7,11 +7,6 @@ export async function middleware(request: NextRequest) {
   const PROTECTED_PREFIXES = ['/chat']
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
 
-  // Allow signup-with-plan without auth (pre-signup page after Stripe checkout)
-  if (pathname === '/signup-with-plan') {
-    return NextResponse.next({ request })
-  }
-
   if (!isProtected) {
     return NextResponse.next({ request })
   }
