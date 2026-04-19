@@ -16,9 +16,7 @@
     "lucide-react": "latest",
     "clsx": "latest",
     "tailwind-merge": "latest",
-    "class-variance-authority": "latest",
-    "@supabase/ssr": "^0.5.0",
-    "@supabase/supabase-js": "^2.45.0"
+    "class-variance-authority": "latest"
   },
   "devDependencies": {
     "typescript": "^5",
