@@ -1,69 +1,20 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { LogOut, Loader2, Zap } from 'lucide-react'
+import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
 }
 
-type BillingInfo = {
-  plan: string
-  messages_used: number
-  messages_limit: number
-  subscription_status: string
-}
-
-const PLAN_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  start: { bg: 'rgba(59, 130, 246, 0.1)', text: '#3b82f6', border: 'rgba(59, 130, 246, 0.2)' },
-  scale: { bg: 'rgba(139, 92, 246, 0.1)', text: '#8b5cf6', border: 'rgba(139, 92, 246, 0.2)' },
-  team: { bg: 'rgba(245, 158, 11, 0.1)', text: '#f59e0b', border: 'rgba(245, 158, 11, 0.2)' },
-  free: { bg: 'rgba(107, 114, 128, 0.1)', text: '#6b7280', border: 'rgba(107, 114, 128, 0.2)' },
-}
-
-const PLAN_LABELS: Record<string, string> = {
-  start: 'Start',
-  scale: 'Scale',
-  team: 'Team',
-  free: 'Free',
-}
-
-function getPlanColors(plan: string) {
-  return PLAN_COLORS[plan.toLowerCase()] ?? PLAN_COLORS.free
-}
-
-function formatMessagesRemaining(used: number, limit: number): string {
-  const remaining = limit - used
-  if (remaining <= 0) return '0 restant'
-  if (remaining === 1) return '1 restant'
-  return `${remaining} restants`
-}
-
 export function UserMenu({ userEmail }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
-  const [billing, setBilling] = useState<BillingInfo | null>(null)
   const ref = useRef<HTMLDivElement>(null)
 
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
-
-  // Fetch billing info silently on mount
-  useEffect(() => {
-    async function fetchBilling() {
-      try {
-        const res = await fetch('/api/billing')
-        if (res.ok) {
-          const data: BillingInfo = await res.json()
-          setBilling(data)
-        }
-      } catch {
-        // Silently ignore — no billing info shown
-      }
-    }
-    fetchBilling()
-  }, [])
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -96,12 +47,6 @@ export function UserMenu({ userEmail }: UserMenuProps) {
     }
   }
 
-  const planColors = billing ? getPlanColors(billing.plan) : null
-  const planLabel = billing ? PLAN_LABELS[billing.plan.toLowerCase()] ?? billing.plan : null
-  const messagesText = billing
-    ? formatMessagesRemaining(billing.messages_used, billing.messages_limit)
-    : null
-
   return (
     <div ref={ref} className="relative">
       {/* Trigger : avatar rond */}
@@ -125,35 +70,9 @@ export function UserMenu({ userEmail }: UserMenuProps) {
                         rounded-lg shadow-xl overflow-hidden py-1">
           {/* Email */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
-            <p className="text-xs" style={{ color: 'var(--text-3)', marginBottom: '2px' }}>
-              Connecté en tant que
-            </p>
-            <p className="text-sm font-medium truncate" style={{ color: 'var(--text)' }}>
-              {userEmail}
-            </p>
+            <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
+            <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
-
-          {/* Plan + quota (only if billing loaded successfully) */}
-          {planColors && planLabel && messagesText && (
-            <div className="px-3 py-2.5 border-b border-[var(--border)] flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Zap size={12} strokeWidth={2} style={{ color: planColors.text }} />
-                <span
-                  className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold"
-                  style={{
-                    backgroundColor: planColors.bg,
-                    color: planColors.text,
-                    border: `1px solid ${planColors.border}`,
-                  }}
-                >
-                  {planLabel}
-                </span>
-              </div>
-              <span className="text-[11px]" style={{ color: 'var(--text-2)' }}>
-                {messagesText}
-              </span>
-            </div>
-          )}
 
           {/* Bouton déconnexion */}
           <button
