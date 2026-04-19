@@ -12,6 +12,10 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Secure data handling** — Encrypted storage, no data resale, revocable access
 - **AI Chat Interface** — Clean, modern chat experience at `/chat` with typing indicators and auto-scroll
 - **User Authentication** — Sign up and log in to access your personal chat
+- **Subscription Plans** — Choose from Start, Scale, or Team plans with monthly message quotas
+- **Automatic Quota Tracking** — Your message count decrements with each sent message
+- **Usage Visibility** — See your current plan and remaining messages in your dashboard
+- **Auto-Renewal** — Monthly quotas reset automatically when your subscription renews
 
 ## 🛠️ Tech Stack
 
@@ -22,6 +26,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Icons**: Lucide React
 - **UI Utilities**: clsx, tailwind-merge, class-variance-authority
 - **Auth**: Supabase Authentication
+- **Payments**: Stripe (Checkout, Webhooks, Customer Portal)
 
 ## 🚀 Quick Start
 
@@ -65,16 +70,25 @@ Add the following content to `.env.local`:
 # Find these in: Supabase Dashboard > Project Settings > API
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Stripe Configuration
+# Find your API keys at: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_test_...
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+
+# Stripe Price IDs — Create products at: https://dashboard.stripe.com/products
+# Go to Products > Add Product > Set price > Copy the Price ID
+STRIPE_PRICE_ID_START=price_...
+STRIPE_PRICE_ID_SCALE=price_...
+STRIPE_PRICE_ID_TEAM=price_...
+
+# Base URL for Stripe redirect URLs
+NEXT_PUBLIC_BASE_URL=http://localhost:3000
+
+# Secret for authenticating cron job requests
+CRON_SECRET=your_random_secret_string
 ```
-
-**How to find your Supabase credentials:**
-
-1. Go to [Supabase](https://supabase.com/) and log in
-2. Select your project
-3. Click **Project Settings** (the gear icon) in the left sidebar
-4. Click **API**
-5. Copy the **Project URL** and paste it as `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy the **anon/public key** and paste it as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ### 4. Run the development server
 
@@ -91,85 +105,150 @@ After a few seconds, you'll see:
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the landing page.
 
-### 5. Create an account
+### 5. Choose a plan
 
-Visit [http://localhost:3000/signup](http://localhost:3000/signup) to create your account. After signing up, you'll be automatically redirected to the chat page.
+On the landing page, select your subscription plan in the **Pricing** section:
+
+- **Start** — 10 messages/month
+- **Scale** — 50 messages/month
+- **Team** — 100 messages/month
+
+Click "Subscribe" on your chosen plan to proceed to Stripe Checkout.
+
+### 6. Complete payment
+
+You'll be redirected to Stripe's secure checkout page. Enter your card details and click "Subscribe". After successful payment, you'll be redirected to account creation.
+
+### 7. Create your account
+
+Fill in your email and password to create your Supabase account. Once created, you'll automatically be redirected to the chat interface with your subscription active.
 
 ## 🔑 Environment Variables
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard → Project Settings → API → Project URL | Your Supabase project connection URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard → Project Settings → API → Project API Keys → anon/public | Public API key for Supabase client authentication |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Public key for client-side Supabase access |
+| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys > Secret key | Secret API key for server-side Stripe operations |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys > Publishable key | Public key for client-side Stripe |
+| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks | Signature secret for verifying webhook events |
+| `STRIPE_PRICE_ID_START` | Yes | Stripe Dashboard > Products > [Your Start product] > Price ID | Price ID for the Start plan ($10/month) |
+| `STRIPE_PRICE_ID_SCALE` | Yes | Stripe Dashboard > Products > [Your Scale product] > Price ID | Price ID for the Scale plan |
+| `STRIPE_PRICE_ID_TEAM` | Yes | Stripe Dashboard > Products > [Your Team product] > Price ID | Price ID for the Team plan |
+| `NEXT_PUBLIC_BASE_URL` | Yes | Your deployment URL | Base URL for Stripe redirect URLs |
+| `CRON_SECRET` | Yes | Any random string you generate | Secret token to authenticate cron job requests |
+
+### How to set up Stripe Products and Price IDs
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/) and log in
+2. Navigate to **Products** > **Add Product**
+3. Create three products: "Start", "Scale", "Team"
+4. For each product:
+   - Set the name and description
+   - Set pricing mode to **Recurring** > **Monthly**
+   - Set the price amount (e.g., 1000 for $10.00)
+   - Click **Add product**
+5. Copy the **Price ID** for each product (starts with `price_`)
+6. Paste these into your `.env.local` file
 
 ## 📁 Project Structure
 
 ```
-my-app/
 ├── src/
-│   ├── app/                    # Next.js App Router — pages and layout
-│   │   ├── globals.css         # Global styles and Tailwind imports
-│   │   ├── layout.tsx          # Root layout (fonts, metadata)
-│   │   ├── page.tsx            # Home page — landing page
-│   │   ├── login/
-│   │   │   └── page.tsx        # Login page at /login
-│   │   ├── signup/
-│   │   │   └── page.tsx        # Signup page at /signup
-│   │   ├── chat/
-│   │   │   └── page.tsx        # AI Chat page at /chat (protected)
-│   │   └── actions/
-│   │       └── auth.ts         # Server-side authentication actions
+│   ├── app/
+│   │   ├── actions/            # Server actions for auth
+│   │   ├── api/
+│   │   │   ├── stripe/         # Stripe endpoints (checkout, webhook, register)
+│   │   │   ├── chat/           # Chat message endpoint
+│   │   │   ├── user/           # User billing info endpoint
+│   │   │   └── cron/           # Monthly quota reset cron job
+│   │   ├── chat/               # Chat page and interface
+│   │   ├── signup/             # Account creation page
+│   │   ├── page.tsx            # Landing page
+│   │   └── layout.tsx          # Root layout
 │   ├── components/
-│   │   ├── ui/                 # Reusable UI components
-│   │   │   ├── Navbar.tsx      # Top navigation bar
-│   │   │   ├── Footer.tsx      # Page footer
-│   │   │   └── UserMenu.tsx    # User dropdown menu with logout
 │   │   ├── auth/               # Authentication components
-│   │   │   ├── AuthCard.tsx    # Shared auth card wrapper
-│   │   │   ├── LoginForm.tsx   # Login form component
-│   │   │   └── SignupForm.tsx  # Signup form component
-│   │   └── sections/           # Landing page sections
-│   ├── lib/
-│   │   └── supabase/
-│   │       ├── client.ts       # Supabase client for browser
-│   │       └── server.ts       # Supabase client for server
-│   └── middleware.ts           # Next.js middleware for route protection
-├── public/                     # Static assets
-├── tailwind.config.ts          # Tailwind CSS configuration
-├── next.config.mjs             # Next.js configuration
+│   │   ├── chat/               # Chat interface components
+│   │   ├── sections/           # Landing page sections (Pricing, etc.)
+│   │   └── ui/                 # Reusable UI components
+│   └── lib/
+│       ├── stripe/             # Stripe server and client utilities
+│       └── hooks/              # Custom React hooks (useUserBilling)
+├── .env.local                  # Environment variables (create from .env.example)
+├── .env.example                # Template for environment variables
 └── package.json                # Dependencies and scripts
 ```
 
-### Key Files for Authentication
+## 💳 Subscription Flow
 
-| File | Purpose |
-|------|---------|
-| `src/app/login/page.tsx` | Login page with email/password form |
-| `src/app/signup/page.tsx` | Signup page with email/password form |
-| `src/components/auth/LoginForm.tsx` | Login form component |
-| `src/components/auth/SignupForm.tsx` | Signup form component |
-| `src/middleware.ts` | Protects `/chat` route — redirects unauthenticated users to `/login` |
-| `src/lib/supabase/client.ts` | Browser-side Supabase client |
-| `src/lib/supabase/server.ts` | Server-side Supabase client |
-| `src/app/actions/auth.ts` | Server actions for sign up, sign in, sign out |
-| `src/components/ui/UserMenu.tsx` | User dropdown with logout button |
+1. **Choose Plan** — User selects a plan on the landing page Pricing section
+2. **Stripe Checkout** — User is redirected to Stripe's secure checkout
+3. **Payment** — User enters card details and confirms
+4. **Webhook** — Stripe sends a webhook confirming the subscription
+5. **Account Creation** — User creates their account
+6. **Activation** — Subscription details and quotas are linked to the account
+7. **Chat Access** — User can now chat, with messages deducted from their quota
+
+## 📊 Usage Tracking
+
+- Each message sent decrements the user's monthly quota
+- When the quota reaches zero, an upgrade prompt appears
+- Users see their current plan and remaining messages in the UI
+- Monthly quotas reset automatically on subscription renewal
 
 ## 🚀 Deploy to Vercel
 
-The easiest way to deploy your Emind app:
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-### Step by step:
+1. **Import your repository** — Click the button above and select your GitHub repo
+2. **Configure environment variables** — Go to Vercel Dashboard > Your Project > Settings > Environment Variables and add all variables from `.env.example`:
+   - All Supabase variables
+   - All Stripe variables (Secret Key, Publishable Key, Webhook Secret, Price IDs)
+   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel deployment URL, e.g., `https://your-app.vercel.app`)
+   - `CRON_SECRET`
+3. **Deploy** — Click Deploy and wait for the build to complete
+4. **Configure Stripe webhook** — In Stripe Dashboard > Developers > Webhooks, add your endpoint:
+   - URL: `https://your-app.vercel.app/api/stripe/webhook`
+   - Events to listen for: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
 
-1. **Import your repository** — Click "Import Git Repository" and select your GitHub repo
-2. **Configure environment variables** — In Vercel dashboard, go to **Settings → Environment Variables** and add:
-   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase anon key
-3. **Deploy** — Click "Deploy" and wait for the build to complete
-4. **Test** — Visit your deployed URL and verify the login/signup flow works
+## ⚠️ Important Notes
 
-> ⚠️ **Important**: Make sure to add both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables in Vercel, otherwise authentication won't work on the deployed site.
+### Stripe Webhook for Local Development
+
+To test webhooks locally, use the Stripe CLI:
+
+```bash
+# Install Stripe CLI
+brew install stripe/stripe-cli/stripe  # Mac
+# or download from https://stripe.com/docs/stripe-cli
+
+# Login
+stripe login
+
+# Forward webhooks to localhost
+stripe listen --forward-to localhost:3000/api/stripe/webhook
+```
+
+Copy the webhook signing secret shown and add it to your `.env.local` as `STRIPE_WEBHOOK_SECRET`.
+
+### Cron Job for Monthly Quota Reset
+
+The `/api/cron/reset-quotas` endpoint resets monthly quotas. Set up a Vercel Cron Job:
+
+1. Create `vercel.json` in the root directory:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/api/cron/reset-quotas",
+      "schedule": "0 0 1 * *"
+    }
+  ]
+}
+```
+
+2. The cron job runs on the first day of each month at midnight.
 
 ## 📝 License
 

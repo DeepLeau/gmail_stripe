@@ -1,16 +1,26 @@
 'use client'
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt'
 
-export function ChatInterface() {
+type ChatInterfaceProps = {
+  /** Plan name passé depuis le serveur pour le CTA upgrade si quota atteint */
+  planName?: string
+}
+
+type SendResult =
+  | { ok: true; response: string; quota_remaining: number; quota_exceeded: boolean }
+  | { ok: false; error: string }
+
+export function ChatInterface({ planName = 'Start' }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [quotaExceeded, setQuotaExceeded] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,13 +32,12 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
-    e?.preventDefault()
-
+  const handleSend = useCallback(async (): Promise<SendResult> => {
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading) {
+      return { ok: false, error: 'no_content' }
+    }
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -37,24 +46,73 @@ export function ChatInterface() {
     }
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
-
-    // Appel API
     setIsLoading(true)
+
     try {
-      const response = await sendMessage(trimmed)
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      })
+
+      // 403 = quota exceeded — message affiché mais comptabilisé
+      if (res.status === 403) {
+        const data = await res.json().catch(() => ({}))
+        if (data.error === 'quota_exceeded') {
+          setQuotaExceeded(true)
+          const aiMessage: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: 'ai',
+            content:
+              "Tu as atteint ton quota de messages pour ce mois. Passe à un plan supérieur pour continuer à discuter.",
+            timestamp: Date.now(),
+          }
+          setMessages((prev) => [...prev, aiMessage])
+          return {
+            ok: true,
+            response: aiMessage.content,
+            quota_remaining: 0,
+            quota_exceeded: true,
+          }
+        }
+      }
+
+      if (!res.ok) {
+        throw new Error('server_error')
+      }
+
+      const data = await res.json()
+
+      // Vérifie si le quota est dépassé même en succès (cas limite)
+      if (data.quota_exceeded) {
+        setQuotaExceeded(true)
+      }
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: data.response,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+      return {
+        ok: true,
+        response: data.response,
+        quota_remaining: data.quota_remaining,
+        quota_exceeded: data.quota_exceeded ?? false,
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      return { ok: false, error: 'network_error' }
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [inputValue, isLoading])
+
+  const handleSubmit = useCallback(async (e?: FormEvent) => {
+    e?.preventDefault()
+    if (quotaExceeded) return
+    await handleSend()
+  }, [quotaExceeded, handleSend])
 
   return (
     <div className="flex flex-col h-full py-6">
@@ -62,9 +120,9 @@ export function ChatInterface() {
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+            <div className="w-10 h-10 rounded-full bg-[var(--surface-2)] flex items-center justify-center mb-4">
               <svg
-                className="w-5 h-5 text-blue-600"
+                className="w-5 h-5 text-[var(--text-3)]"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -77,10 +135,10 @@ export function ChatInterface() {
                 />
               </svg>
             </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">
+            <p className="text-sm font-medium text-[var(--text-1)] mb-1">
               Pose tes questions à tes emails
             </p>
-            <p className="text-xs text-gray-500 max-w-xs">
+            <p className="text-xs text-[var(--text-3)] max-w-xs">
               Dicte une question en langage naturel. L&apos;IA explore tes emails et te répond.
             </p>
           </div>
@@ -95,14 +153,20 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
+      {/* Zone fixe en bas */}
       <div className="shrink-0 pt-4">
-        <ChatInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={() => handleSubmit()}
-          isLoading={isLoading}
-        />
+        {/* Upgrade prompt — affiché quand le quota est épuisé */}
+        {quotaExceeded && <UpgradePrompt planName={planName} />}
+
+        {/* Input — disabled visuellement quand quota atteint */}
+        <div className={quotaExceeded ? 'opacity-60 pointer-events-none' : ''}>
+          <ChatInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={() => handleSubmit()}
+            isLoading={isLoading}
+          />
+        </div>
       </div>
     </div>
   )

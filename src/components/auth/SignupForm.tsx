@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,7 +18,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+type SignupFormProps = {
+  /** Stripe session_id passé depuis la page signup via query param */
+  sessionId?: string | null
+  /** Plan name déduit du session_id pour affichage dans le CTA */
+  planPreview?: string | null
+}
+
+export function SignupForm({ sessionId, planPreview }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -26,12 +33,13 @@ export function SignupForm() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const isLoading = state.status === 'loading'
+  const isPostCheckout = !!sessionId
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -77,15 +85,71 @@ export function SignupForm() {
       return
     }
 
+    // --- Post-checkout flow: créer le compte puis confirmer la session Stripe ---
+    if (isPostCheckout && sessionId) {
+      try {
+        // Créer le compte d'abord
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+        })
+
+        if (signUpError) {
+          const message =
+            signUpError.message === 'User already registered'
+              ? 'Un compte existe déjà avec cet email'
+              : "Une erreur est survenue lors de la création du compte"
+          setState({ status: 'error', errorMessage: message })
+          return
+        }
+
+        // Confirmer la session Stripe côté serveur pour lier le plan
+        const confirmRes = await fetch('/api/stripe/confirm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId }),
+        })
+
+        if (!confirmRes.ok) {
+          const err = await confirmRes.json().catch(() => ({}))
+          if (err.error === 'invalid_session' || err.error === 'session_expired') {
+            setState({
+              status: 'error',
+              errorMessage:
+                "La session de paiement a expiré. Retourne sur la page des tarifs pour renouveler ton inscription.",
+            })
+            return
+          }
+          if (err.error === 'session_already_used') {
+            setState({
+              status: 'error',
+              errorMessage: 'Ce lien a déjà été utilisé. Connecte-toi avec ton email.',
+            })
+            return
+          }
+          setState({ status: 'error', errorMessage: "Une erreur est survenue. Connecte-toi pour accéder à ton compte." })
+          return
+        }
+
+        // Redirection vers /chat après confirmation réussie
+        router.push('/chat')
+      } catch {
+        setState({ status: 'error', errorMessage: 'Une erreur est survenue. Réessaie.' })
+      }
+      return
+    }
+
+    // --- Flow standard : signup sans plan (free tier) ---
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
 
     if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
+      const message =
+        error.message === 'User already registered'
+          ? 'Un compte existe déjà avec cet email'
+          : "Une erreur est survenue lors de la création du compte"
       setState({ status: 'error', errorMessage: message })
       return
     }
@@ -95,6 +159,30 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Post-checkout notice */}
+      {isPostCheckout && (
+        <div
+          className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-xs"
+          style={{
+            backgroundColor: 'var(--accent)',
+            background: 'linear-gradient(135deg, rgba(99,102,241,0.1) 0%, rgba(99,102,241,0.05) 100%)',
+            border: '1px solid rgba(99,102,241,0.2)',
+            color: 'var(--text-2)',
+            lineHeight: 1.5,
+          }}
+        >
+          <span
+            className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-0.5"
+            style={{ backgroundColor: 'var(--accent-hi)' }}
+          />
+          <span>
+            Tu t&apos;inscris avec le plan{' '}
+            <strong style={{ color: 'var(--text-1)' }}>{planPreview ?? 'payant'}</strong>
+            . Ton abonnement sera actif après la création du compte.
+          </span>
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -197,10 +285,12 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {isPostCheckout ? 'Création avec ton plan...' : 'Création en cours...'}
+            </span>
           </>
         ) : (
-          <span>Créer un compte</span>
+          <span>{isPostCheckout ? 'Créer mon compte et activer mon plan' : 'Créer un compte'}</span>
         )}
       </button>
     </form>
