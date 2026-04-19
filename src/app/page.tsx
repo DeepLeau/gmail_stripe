@@ -1,25 +1,31 @@
-import { Navbar } from '@/components/ui/Navbar'
-import { Footer } from '@/components/ui/Footer'
+import { Navbar } from '@/components/sections/Navbar'
 import { Hero } from '@/components/sections/Hero'
-import { QuestionExamples } from '@/components/sections/QuestionExamples'
-import { HowItWorks } from '@/components/sections/HowItWorks'
-import { Features } from '@/components/sections/Features'
-import { TrustSecurity } from '@/components/sections/TrustSecurity'
+import { ProofStrip } from '@/components/sections/ProofStrip'
+import { Problem } from '@/components/sections/Problem'
+import { ProductFeature } from '@/components/sections/ProductFeature'
+import { Workflow } from '@/components/sections/Workflow'
+import { Integrations } from '@/components/sections/Integrations'
 import { Pricing } from '@/components/sections/Pricing'
-import { FinalCTA } from '@/components/sections/FinalCTA'
+import { Testimonials } from '@/components/sections/Testimonials'
+import { DemoCta } from '@/components/sections/DemoCta'
+import { Footer } from '@/components/sections/Footer'
+import { Ticker } from '@/components/sections/Ticker'
 
 export default function HomePage() {
   return (
     <main>
       <Navbar />
       <Hero />
-      <QuestionExamples />
-      <HowItWorks />
-      <Features />
-      <TrustSecurity />
+      <ProofStrip />
+      <Problem />
+      <ProductFeature />
+      <Workflow />
+      <Integrations />
       <Pricing />
-      <FinalCTA />
+      <Testimonials />
+      <DemoCta />
       <Footer />
+      <Ticker />
     </main>
   )
 }

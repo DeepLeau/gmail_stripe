@@ -1,279 +1,260 @@
 'use client'
 
-import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { useState } from 'react'
+import { Check, X, Loader2 } from 'lucide-react'
+
+type PlanKey = 'start' | 'scale' | 'team'
+
+interface PlanState {
+  loading: boolean
+  error: string | null
+}
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
-    period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    key: 'start' as PlanKey,
+    badge: 'Start',
+    badgeColor: 'text-graphite-900',
+    price: '29',
+    highlight: false,
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
-      { text: 'Priorité de traitement', included: false },
+      { text: '10 messages / mois', included: true },
+      { text: '1 utilisateur', included: true },
+      { text: 'Support par email', included: true },
+      { text: 'Analytics de base', included: true },
+      { text: 'Utilisateurs multiples', included: false },
+      { text: 'Support prioritaire', included: false },
+      { text: 'Webhooks API', included: false },
     ],
-    cta: 'Commencer gratuitement',
-    highlighted: false,
+    cta: 'Choisir Start',
   },
   {
-    name: 'Pro',
-    price: '19 €',
-    period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    key: 'scale' as PlanKey,
+    badge: 'Populaire',
+    badgeColor: 'text-amber',
+    price: '79',
+    highlight: true,
     features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: true },
-      { text: 'Priorité de traitement', included: true },
+      { text: '50 messages / mois', included: true },
+      { text: '3 utilisateurs', included: true },
+      { text: 'Support prioritaire', included: true },
+      { text: 'Analytics avancés', included: true },
+      { text: 'Utilisateurs multiples', included: true },
+      { text: 'Webhooks API', included: false },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    cta: 'Choisir Scale',
+  },
+  {
+    key: 'team' as PlanKey,
+    badge: 'Team',
+    badgeColor: 'text-graphite-900',
+    price: '149',
+    highlight: false,
+    features: [
+      { text: '100 messages / mois', included: true },
+      { text: 'Utilisateurs illimités', included: true },
+      { text: 'Support dédié', included: true },
+      { text: 'Analytics avancés', included: true },
+      { text: 'Webhooks API', included: true },
+    ],
+    cta: 'Choisir Team',
   },
 ]
 
-const containerVariants: Variants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.15, delayChildren: 0.1 },
-  },
-}
-
-const cardVariants: Variants = {
-  hidden: { opacity: 0, y: 24 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
-}
+const bottomFeatures = [
+  'Messages non utilisés non reportés',
+  'Renouvellement automatique',
+  'Annulation anytime',
+  'Sans engagement',
+]
 
 export function Pricing() {
+  const [states, setStates] = useState<Record<PlanKey, PlanState>>({
+    start: { loading: false, error: null },
+    scale: { loading: false, error: null },
+    team: { loading: false, error: null },
+  })
+
+  async function handleCheckout(plan: PlanKey) {
+    // Reset state
+    setStates((prev) => ({
+      ...prev,
+      [plan]: { loading: true, error: null },
+    }))
+
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) {
+        setStates((prev) => ({
+          ...prev,
+          [plan]: {
+            loading: false,
+            error: data.error === 'invalid_plan'
+              ? 'Plan invalide. Veuillez sélectionner un autre plan.'
+              : 'Erreur de connexion. Veuillez réessayer.',
+          },
+        }))
+        return
+      }
+
+      window.location.href = data.url
+    } catch {
+      setStates((prev) => ({
+        ...prev,
+        [plan]: {
+          loading: false,
+          error: 'Erreur de connexion. Veuillez réessayer.',
+        },
+      }))
+    }
+  }
+
   return (
     <section
       id="pricing"
-      className="py-24 px-6"
-      style={{ backgroundColor: 'var(--surface)' }}
+      className="py-section px-container relative bg-surface observe-section"
     >
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-14">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5 }}
-            className="mb-4"
-          >
-            <span
-              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold uppercase tracking-widest"
-              style={{
-                backgroundColor: 'var(--accent-light)',
-                color: 'var(--accent)',
-                border: '1px solid rgba(59, 130, 246, 0.2)',
-              }}
-            >
-              <span
-                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                style={{ backgroundColor: 'var(--accent)' }}
-              />
-              Tarifs
-            </span>
-          </motion.div>
-          <motion.h2
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.1 }}
-            className="text-3xl sm:text-4xl font-semibold tracking-tight mb-4"
-            style={{ color: 'var(--text)', letterSpacing: '-0.025em' }}
-          >
-            Un tarif adapté à ton rythme
-          </motion.h2>
-          <motion.p
-            initial={{ opacity: 0, y: 20 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.5, delay: 0.18 }}
-            className="text-base max-w-md mx-auto"
-            style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
-          >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
-          </motion.p>
+      <div className="scan-line absolute top-0 left-0 w-full h-[1px] bg-graphite-900/10" />
+      <div className="max-w-[clamp(70rem,92vw,96rem)] mx-auto">
+        <div className="text-center mb-16 reveal-up">
+          <span className="font-mono text-xs font-medium uppercase tracking-[0.18em] text-amber inline-block mb-4">
+            [06] TARIFS
+          </span>
+          <h2 className="font-display font-light text-h2 leading-[1.1] tracking-tight text-graphite-900 mb-4 mx-auto">
+            Un quota adapté à votre rythme.
+          </h2>
+          <p className="font-mono text-xs text-graphite-500">
+            Messages non utilisés non reportés · Sans engagement · Annulation anytime
+          </p>
         </div>
 
-        {/* Cards */}
-        <motion.div
-          variants={containerVariants}
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
-        >
-          {plans.map((plan, i) => (
-            <motion.div
-              key={i}
-              variants={cardVariants}
-              className="relative rounded-xl p-8 flex flex-col gap-6"
-              style={
-                plan.highlighted
-                  ? {
-                      backgroundColor: 'var(--bg)',
-                      border: '2px solid var(--accent)',
-                      boxShadow:
-                        '0 20px 60px rgba(59, 130, 246, 0.12), 0 0 40px rgba(59, 130, 246, 0.06)',
-                    }
-                  : {
-                      backgroundColor: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
-                    }
-              }
-            >
-              {/* Top accent line for Pro */}
-              {plan.highlighted && (
-                <div
-                  className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-                  }}
-                />
-              )}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border border-graphite-900/10 reveal-up">
+          {plans.map((plan) => {
+            const state = states[plan.key]
+            const isHighlight = plan.highlight
 
-              {/* Badge */}
-              {plan.badge && (
-                <div className="flex justify-center">
-                  <span
-                    className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
-                    style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
-                      color: '#fff',
-                    }}
-                  >
-                    {plan.badge}
-                  </span>
-                </div>
-              )}
-
-              {/* Plan name + description */}
-              <div>
-                <p
-                  className="text-lg font-semibold tracking-tight mb-1"
-                  style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
+            return (
+              <div
+                key={plan.key}
+                className={`p-8 md:p-10 flex flex-col ${isHighlight ? 'relative shadow-[0_0_40px_rgba(14,15,17,0.05)] z-10 -mt-2 -mb-2' : 'border-b md:border-b-0 md:border-r border-graphite-900/10 bg-canvas/30'} ${!isHighlight ? 'hover:bg-canvas' : ''} transition-colors`}
+                style={isHighlight ? { borderTop: '2px solid #E8A020' } : undefined}
+              >
+                {/* Badge */}
+                <span
+                  className={`font-mono text-xs font-bold uppercase tracking-widest ${plan.badgeColor} mb-2 block`}
                 >
-                  {plan.name}
-                </p>
-                <p
-                  className="text-sm mb-4"
-                  style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
-                >
-                  {plan.description}
-                </p>
+                  {plan.badge}
+                </span>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
-                  <span
-                    className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
-                  >
-                    {plan.price}
+                <div className="mb-6">
+                  <span className="font-mono text-3xl font-medium text-graphite-900">
+                    {plan.price} €
                   </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
-                    / {plan.period}
-                  </span>
+                  <span className="font-mono text-xs text-graphite-500 uppercase"> / mois</span>
                 </div>
+
+                {/* Description */}
+                <p className="font-body text-sm text-graphite-500 mb-8 flex-grow">
+                  {plan.key === 'start' &&
+                    'Pour découvrir MessageMind et ses capacités de chat intelligent.'}
+                  {plan.key === 'scale' &&
+                    'Pour les équipes qui échangent activement et souhaitent prioriser les insights.'}
+                  {plan.key === 'team' &&
+                    'Pour les organisations qui veulent un chat sans limite avec un support dédié.'}
+                </p>
+
+                {/* Features */}
+                <ul className="flex flex-col gap-3 mb-8 flex-1">
+                  {plan.features.map((feature, i) => (
+                    <li
+                      key={i}
+                      className={`flex items-start gap-3 text-sm ${!feature.included ? 'opacity-40' : ''}`}
+                    >
+                      {feature.included ? (
+                        <Check
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: '#E8A020' }}
+                        />
+                      ) : (
+                        <X
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: '#5C5F66' }}
+                        />
+                      )}
+                      {feature.text}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA Button */}
+                <button
+                  onClick={() => handleCheckout(plan.key)}
+                  disabled={state.loading}
+                  className={`relative w-full py-3 font-mono text-xs font-medium uppercase tracking-[0.1em] flex items-center justify-center gap-2 rounded-none transition-all duration-300 hover:-translate-y-0.5 group disabled:opacity-60 disabled:cursor-not-allowed ${
+                    isHighlight
+                      ? 'bg-gradient-to-b from-graphite-800 to-graphite-900 text-surface shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_4px_20px_rgba(14,15,17,0.2)] hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.1),0_8px_32px_rgba(14,15,17,0.3)]'
+                      : 'bg-surface border border-graphite-900/10 text-graphite-900 shadow-[0_2px_10px_rgba(14,15,17,0.02)] hover:shadow-[0_8px_24px_rgba(14,15,17,0.06)] hover:border-graphite-900/20'
+                  }`}
+                >
+                  {state.loading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin shrink-0" />
+                      <span>Redirection vers Stripe...</span>
+                    </>
+                  ) : (
+                    plan.cta
+                  )}
+                </button>
+
+                {/* Error message */}
+                {state.error && (
+                  <p className="mt-3 font-mono text-xs text-red-500 text-center flex items-center justify-center gap-1.5">
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      className="shrink-0"
+                    >
+                      <circle cx="12" cy="12" r="10" />
+                      <line x1="12" y1="8" x2="12" y2="12" />
+                      <line x1="12" y1="16" x2="12.01" y2="16" />
+                    </svg>
+                    {state.error}
+                  </p>
+                )}
               </div>
+            )
+          })}
+        </div>
 
-              {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
-
-              {/* Features */}
-              <ul className="flex flex-col gap-3 flex-1">
-                {plan.features.map((feature, j) => (
-                  <li
-                    key={j}
-                    className="flex items-start gap-3 text-sm"
-                    style={{
-                      color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
-                    }}
-                  >
-                    {feature.included ? (
-                      <Check
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--accent)' }}
-                      />
-                    ) : (
-                      <X
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--text-3)' }}
-                      />
-                    )}
-                    {feature.text}
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
-                style={
-                  plan.highlighted
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
-                      }
-                }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
-              >
-                {plan.cta}
-              </button>
-            </motion.div>
+        {/* Bottom features row */}
+        <div className="flex flex-wrap items-center justify-center gap-4 mt-12 reveal-up">
+          {bottomFeatures.map((feat, i) => (
+            <div key={i} className="flex items-center gap-2 font-mono text-xs text-graphite-500 uppercase tracking-widest">
+              <span style={{ color: '#10B981' }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="20,6 9,17 4,12" />
+                </svg>
+              </span>
+              {feat}
+            </div>
           ))}
-        </motion.div>
+        </div>
       </div>
     </section>
   )
