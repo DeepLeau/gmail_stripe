@@ -6,17 +6,18 @@ import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
+  plan?: string
+  messagesRemaining?: number
+  subscriptionLoading?: boolean
 }
 
-export function UserMenu({ userEmail }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, messagesRemaining, subscriptionLoading }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Fermeture clic extérieur + Escape
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -49,7 +50,6 @@ export function UserMenu({ userEmail }: UserMenuProps) {
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger : avatar rond */}
       <button
         onClick={() => setOpen(!open)}
         aria-label="Menu utilisateur"
@@ -62,19 +62,48 @@ export function UserMenu({ userEmail }: UserMenuProps) {
         {initials}
       </button>
 
-      {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50
-                        min-w-[220px] w-max
-                        bg-white border border-[var(--border-md)]
-                        rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email */}
+        <div
+          className="absolute right-0 top-full mt-2 z-50
+                      min-w-[220px] w-max
+                      bg-white border border-[var(--border-md)]
+                      rounded-lg shadow-xl overflow-hidden py-1"
+        >
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
 
-          {/* Bouton déconnexion */}
+          <div className="px-3 py-2.5 border-b border-[var(--border)]">
+            <p className="text-xs text-[var(--text-3)] mb-1">Abonnement</p>
+            {subscriptionLoading ? (
+              <div className="h-5 w-16 rounded-full animate-pulse" style={{ backgroundColor: 'var(--border)' }} />
+            ) : plan ? (
+              <div className="flex flex-col gap-1">
+                <span
+                  className="inline-flex px-2 py-0.5 rounded-full text-[11px] font-semibold uppercase tracking-wide w-fit"
+                  style={{
+                    backgroundColor: 'var(--accent-light)',
+                    color: 'var(--accent)',
+                  }}
+                >
+                  Plan {plan}
+                </span>
+                <p className="text-xs" style={{ color: 'var(--text-2)' }}>
+                  {messagesRemaining !== undefined && messagesRemaining > 0 ? (
+                    <>
+                      <span className="font-medium">{messagesRemaining}</span> messages restants ce mois
+                    </>
+                  ) : (
+                    <span style={{ color: 'var(--text-3)' }}>0 message restant</span>
+                  )}
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs" style={{ color: 'var(--text-3)' }}>—</p>
+            )}
+          </div>
+
           <button
             onClick={handleLogout}
             disabled={loggingOut}

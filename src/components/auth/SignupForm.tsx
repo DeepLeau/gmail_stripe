@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { signUpAction } from '@/app/actions/auth'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,7 +19,11 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+type SignupFormProps = {
+  sessionId?: string
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')

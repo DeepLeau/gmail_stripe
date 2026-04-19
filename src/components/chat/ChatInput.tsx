@@ -8,9 +8,18 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
+  disabledReason?: string
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  disabled = false,
+  disabledReason,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -39,9 +48,8 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading) {
+      if (value.trim() && !isLoading && !disabled) {
         onSubmit()
-        // Reset textarea après envoi
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
           textareaRef.current.style.overflowY = 'hidden'
@@ -50,44 +58,49 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
     }
   }
 
-  const isDisabled = isLoading || !value.trim()
+  const isDisabled = isLoading || !value.trim() || disabled
 
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!isDisabled) onSubmit()
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-          textareaRef.current.style.overflowY = 'hidden'
-        }
-      }}
-      className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
-    >
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Pose une question..."
-        rows={1}
-        disabled={isLoading}
-        className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
-        style={{
-          height: 'auto',
-          overflowY: 'hidden',
-          lineHeight: '24px',
+    <div className="flex flex-col gap-1.5">
+      <form
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!isDisabled) onSubmit()
+          if (textareaRef.current) {
+            textareaRef.current.style.height = 'auto'
+            textareaRef.current.style.overflowY = 'hidden'
+          }
         }}
-      />
-
-      <button
-        type="submit"
-        disabled={isDisabled}
-        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
-        aria-label="Envoyer"
+        className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
       >
-        <Send size={15} className="text-white" strokeWidth={2} />
-      </button>
-    </form>
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder="Pose une question..."
+          rows={1}
+          disabled={isDisabled}
+          className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
+          style={isDisabled ? { opacity: 0.6 } : undefined}
+          aria-label="Message"
+        />
+
+        <button
+          type="submit"
+          disabled={isDisabled}
+          className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
+          aria-label="Envoyer"
+        >
+          <Send size={15} className="text-white" strokeWidth={2} />
+        </button>
+      </form>
+
+      {disabled && disabledReason && (
+        <p className="text-xs leading-tight" style={{ color: 'var(--text-3)' }}>
+          {disabledReason}
+        </p>
+      )}
+    </div>
   )
 }

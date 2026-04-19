@@ -4,7 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const PROTECTED_PREFIXES = ['/chat']
+  const PROTECTED_PREFIXES = ['/chat', '/settings']
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
 
   if (!isProtected) {
