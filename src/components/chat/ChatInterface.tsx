@@ -6,12 +6,45 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { UsageBanner } from '@/components/ui/UsageBanner'
+
+type SubscriptionInfo = {
+  plan: string
+  quotaUsed: number
+  quotaLimit: number
+  quotaRenewedAt: string
+  status: string
+}
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [quotaExceeded, setQuotaExceeded] = useState(false)
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+  const [loadingSubscription, setLoadingSubscription] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Charger l'abonnement au mount
+  useEffect(() => {
+    async function loadSubscription() {
+      try {
+        const res = await fetch('/api/subscription')
+        if (res.ok) {
+          const data = await res.json()
+          setSubscription(data)
+          if (data.quotaUsed >= data.quotaLimit) {
+            setQuotaExceeded(true)
+          }
+        }
+      } catch {
+        // Silencieux : le chat reste fonctionnel sans quota
+      } finally {
+        setLoadingSubscription(false)
+      }
+    }
+    loadSubscription()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -26,7 +59,7 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || quotaExceeded) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -38,9 +71,38 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API de décrement
     setIsLoading(true)
     try {
+      const decrementRes = await fetch('/api/messages/decrement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messageId: userMessage.id }),
+      })
+
+      if (decrementRes.status === 429) {
+        setQuotaExceeded(true)
+        setMessages((prev) => prev.slice(0, -1))
+        return
+      }
+
+      if (!decrementRes.ok) {
+        throw new Error('Erreur de quota')
+      }
+
+      const { remaining } = await decrementRes.json()
+
+      // Mettre à jour le compteur local
+      if (subscription) {
+        setSubscription((prev) =>
+          prev ? { ...prev, quotaUsed: prev.quotaLimit - remaining } : null
+        )
+        if (remaining === 0) {
+          setQuotaExceeded(true)
+        }
+      }
+
+      // Appel à l'API mock pour la réponse IA
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -50,7 +112,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      setMessages((prev) => prev.slice(0, -1))
     } finally {
       setIsLoading(false)
     }
@@ -58,17 +120,29 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* UsageBanner si quota épuisé */}
+      {quotaExceeded && subscription && (
+        <UsageBanner
+          quotaUsed={subscription.quotaUsed}
+          quotaLimit={subscription.quotaLimit}
+        />
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-        {messages.length === 0 && (
+        {messages.length === 0 && !loadingSubscription && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+              style={{ backgroundColor: 'rgba(99,102,241,0.08)' }}
+            >
               <svg
-                className="w-5 h-5 text-blue-600"
+                className="w-5 h-5"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
                 strokeWidth={1.5}
+                style={{ color: 'var(--accent-hi)' }}
               >
                 <path
                   strokeLinecap="round"
@@ -77,11 +151,18 @@ export function ChatInterface() {
                 />
               </svg>
             </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">
+            <p
+              className="text-sm font-medium mb-1"
+              style={{ color: 'var(--text)' }}
+            >
               Pose tes questions à tes emails
             </p>
-            <p className="text-xs text-gray-500 max-w-xs">
-              Dicte une question en langage naturel. L&apos;IA explore tes emails et te répond.
+            <p
+              className="text-xs max-w-xs"
+              style={{ color: 'var(--text-3)' }}
+            >
+              Dicte une question en langage naturel. L&apos;IA explore tes
+              emails et te répond.
             </p>
           </div>
         )}

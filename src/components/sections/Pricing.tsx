@@ -1,41 +1,62 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
-const plans = [
+const PLANS = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: 'Start',
+    price: '10 €',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    planId: 'start',
+    description: 'Pour découvrir Emind et automation tes réponses email.',
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
+      { text: '10 messages / mois', included: true },
+      { text: '1 boîte email connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    name: 'Scale',
+    price: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    planId: 'scale',
+    description: 'Pour les équipes qui gèrent plusieurs boîtes email.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '50 messages / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    name: 'Team',
+    price: '49 €',
+    period: 'mois',
+    planId: 'team',
+    description: 'Pour les équipes avec des besoins élevés en volume.',
+    features: [
+      { text: '100 messages / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -52,7 +73,57 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
-export function Pricing() {
+interface PricingProps {
+  currentPlan?: string
+}
+
+export function Pricing({ currentPlan }: PricingProps) {
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCTA(planId: string) {
+    if (planId === 'start' && !currentPlan) {
+      window.location.href = '/signup'
+      return
+    }
+
+    setError(null)
+    setLoadingPlanId(planId)
+
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase!.auth.getUser()
+
+      if (!user) {
+        window.location.href = '/signup'
+        return
+      }
+
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId, userId: user.id }),
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        if (res.status === 400) {
+          setError(data.error ?? 'Plan invalide')
+        } else {
+          setError('Une erreur est survenue. Réessaie plus tard.')
+        }
+        return
+      }
+
+      const { url } = await res.json()
+      window.location.href = url
+    } catch {
+      setError('Une erreur de connexion est survenue.')
+    } finally {
+      setLoadingPlanId(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,9 +173,23 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à un plan payant quand tu ne peux plus t'en passer.
           </motion.p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div
+            className="text-sm text-center py-2.5 px-4 rounded-lg mb-6"
+            style={{
+              backgroundColor: 'rgba(248,113,113,0.08)',
+              border: '1px solid rgba(248,113,113,0.20)',
+              color: 'var(--red)',
+            }}
+          >
+            {error}
+          </div>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -112,167 +197,188 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
-            <motion.div
-              key={i}
-              variants={cardVariants}
-              className="relative rounded-xl p-8 flex flex-col gap-6"
-              style={
-                plan.highlighted
-                  ? {
-                      backgroundColor: 'var(--bg)',
-                      border: '2px solid var(--accent)',
-                      boxShadow:
-                        '0 20px 60px rgba(59, 130, 246, 0.12), 0 0 40px rgba(59, 130, 246, 0.06)',
-                    }
-                  : {
-                      backgroundColor: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
-                    }
-              }
-            >
-              {/* Top accent line for Pro */}
-              {plan.highlighted && (
-                <div
-                  className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-                  }}
-                />
-              )}
+          {PLANS.map((plan) => {
+            const isCurrent = currentPlan === plan.planId
+            const isLoading = loadingPlanId === plan.planId
 
-              {/* Badge */}
-              {plan.badge && (
-                <div className="flex justify-center">
-                  <span
-                    className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
-                    style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
-                      color: '#fff',
-                    }}
-                  >
-                    {plan.badge}
-                  </span>
-                </div>
-              )}
-
-              {/* Plan name + description */}
-              <div>
-                <p
-                  className="text-lg font-semibold tracking-tight mb-1"
-                  style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
-                >
-                  {plan.name}
-                </p>
-                <p
-                  className="text-sm mb-4"
-                  style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
-                >
-                  {plan.description}
-                </p>
-
-                {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
-                  <span
-                    className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
-                  >
-                    {plan.price}
-                  </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
-                    / {plan.period}
-                  </span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
-
-              {/* Features */}
-              <ul className="flex flex-col gap-3 flex-1">
-                {plan.features.map((feature, j) => (
-                  <li
-                    key={j}
-                    className="flex items-start gap-3 text-sm"
-                    style={{
-                      color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
-                    }}
-                  >
-                    {feature.included ? (
-                      <Check
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--accent)' }}
-                      />
-                    ) : (
-                      <X
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--text-3)' }}
-                      />
-                    )}
-                    {feature.text}
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+            return (
+              <motion.div
+                key={plan.planId}
+                variants={cardVariants}
+                className="relative rounded-xl p-8 flex flex-col gap-6"
                 style={
                   plan.highlighted
                     ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        backgroundColor: 'var(--bg)',
+                        border: '2px solid var(--accent)',
+                        boxShadow:
+                          '0 20px 60px rgba(59, 130, 246, 0.12), 0 0 40px rgba(59, 130, 246, 0.06)',
                       }
                     : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
+                        backgroundColor: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
                       }
                 }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
               >
-                {plan.cta}
-              </button>
-            </motion.div>
-          ))}
+                {/* Top accent line for Scale */}
+                {plan.highlighted && (
+                  <div
+                    className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
+                    }}
+                  />
+                )}
+
+                {/* Badge */}
+                {plan.badge && (
+                  <div className="flex justify-center">
+                    <span
+                      className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
+                      style={{
+                        background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                        color: '#fff',
+                      }}
+                    >
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+
+                {/* Plan name + description */}
+                <div>
+                  <p
+                    className="text-lg font-semibold tracking-tight mb-1"
+                    style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
+                  >
+                    {plan.name}
+                  </p>
+                  <p
+                    className="text-sm mb-4"
+                    style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
+                  >
+                    {plan.description}
+                  </p>
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-1.5 mb-4">
+                    <span
+                      className="text-4xl font-bold tracking-tight"
+                      style={{
+                        color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                        letterSpacing: '-0.04em',
+                      }}
+                    >
+                      {plan.price}
+                    </span>
+                    <span
+                      className="text-sm"
+                      style={{ color: 'var(--text-3)' }}
+                    >
+                      / {plan.period}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  className="h-px w-full"
+                  style={{ backgroundColor: 'var(--border)' }}
+                />
+
+                {/* Features */}
+                <ul className="flex flex-col gap-3 flex-1">
+                  {plan.features.map((feature, j) => (
+                    <li
+                      key={j}
+                      className="flex items-start gap-3 text-sm"
+                      style={{
+                        color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
+                      }}
+                    >
+                      {feature.included ? (
+                        <Check
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: 'var(--accent)' }}
+                        />
+                      ) : (
+                        <X
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: 'var(--text-3)' }}
+                        />
+                      )}
+                      {feature.text}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <button
+                  onClick={() => handleCTA(plan.planId)}
+                  disabled={isLoading}
+                  className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150
+                             flex items-center justify-center gap-2
+                             disabled:opacity-60 disabled:cursor-not-allowed"
+                  style={
+                    plan.highlighted
+                      ? {
+                          backgroundColor: 'var(--accent)',
+                          color: '#fff',
+                          boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          color: 'var(--text-2)',
+                          border: '1px solid var(--border-md)',
+                        }
+                  }
+                  onMouseEnter={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--accent-hi)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform =
+                        'translateY(-1px)'
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+                        'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--accent)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform = ''
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+                        'var(--border-md)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--text-2)'
+                    }
+                  }}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin shrink-0" />
+                      <span>Redirection...</span>
+                    </>
+                  ) : isCurrent ? (
+                    <span>Plan actuel</span>
+                  ) : (
+                    plan.cta
+                  )}
+                </button>
+              </motion.div>
+            )
+          })}
         </motion.div>
       </div>
     </section>

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -20,18 +20,44 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const stripeSessionId = searchParams.get('session_id')
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [sessionLinked, setSessionLinked] = useState<boolean | null>(
+    stripeSessionId ? null : false
+  )
 
   const isLoading = state.status === 'loading'
+
+  // Si un session_id Stripe est passé, vérifier si l'abonnement est déjà lié
+  // (le webhook a pu already fire avant la création du compte)
+  useEffect(() => {
+    if (!stripeSessionId) return
+    const supabase = createClient()
+    if (!supabase) return
+
+    // Vérifier si la session Stripe est déjà liée à un abonnement
+    supabase
+      .from('user_subscriptions')
+      .select('user_id')
+      .eq('stripe_session_id', stripeSessionId)
+      .single()
+      .then(({ data }) => {
+        if (data?.user_id) {
+          setSessionLinked(true)
+        }
+      })
+  }, [stripeSessionId])
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -73,21 +99,40 @@ export function SignupForm() {
 
     const supabase = createClient()
     if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+      setState({
+        status: 'error',
+        errorMessage: 'Service temporairement indisponible',
+      })
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
 
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
+    if (authError) {
+      const message =
+        authError.message === 'User already registered'
+          ? 'Un compte existe déjà avec cet email'
+          : "Une erreur est survenue lors de la création du compte"
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Lier l'abonnement Stripe si session_id présent
+    if (authData.user && stripeSessionId) {
+      // Si le webhook a déjà fire, la subscription existe déjà.
+      // Sinon on met à jour stripe_session_id sur la row en attente.
+      if (!sessionLinked) {
+        await supabase
+          .from('user_subscriptions')
+          .update({ stripe_session_id: stripeSessionId })
+          .eq('user_id', authData.user.id)
+          .is('stripe_session_id', null)
+          .order('created_at', { ascending: false })
+          .limit(1)
+      }
     }
 
     router.push('/chat')
@@ -95,9 +140,28 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Notice: plan sélectionnée avant inscription */}
+      {stripeSessionId && (
+        <div
+          className="text-sm px-3 py-2.5 rounded-lg"
+          style={{
+            backgroundColor: 'rgba(99,102,241,0.08)',
+            border: '1px solid rgba(99,102,241,0.20)',
+            color: 'var(--accent-hi)',
+          }}
+        >
+          Tu as sélectionné un plan payant. Termine ton inscription pour
+          activer ton abonnement.
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
+        <label
+          htmlFor="email"
+          className="text-sm font-medium"
+          style={{ color: 'var(--text-2)' }}
+        >
           Adresse email
         </label>
         <input
@@ -115,7 +179,10 @@ export function SignupForm() {
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
         {state.status === 'error' && state.fieldErrors?.email && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
+          <p
+            className="text-xs flex items-center gap-1"
+            style={{ color: 'var(--red)' }}
+          >
             {state.fieldErrors.email}
           </p>
         )}
@@ -123,7 +190,11 @@ export function SignupForm() {
 
       {/* Champ mot de passe */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium text-[var(--text-2)]">
+        <label
+          htmlFor="password"
+          className="text-sm font-medium"
+          style={{ color: 'var(--text-2)' }}
+        >
           Mot de passe
         </label>
         <input
@@ -141,7 +212,10 @@ export function SignupForm() {
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
         {state.status === 'error' && state.fieldErrors?.password && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
+          <p
+            className="text-xs flex items-center gap-1"
+            style={{ color: 'var(--red)' }}
+          >
             {state.fieldErrors.password}
           </p>
         )}
@@ -149,7 +223,11 @@ export function SignupForm() {
 
       {/* Champ confirmation mot de passe */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirmPassword" className="text-sm font-medium text-[var(--text-2)]">
+        <label
+          htmlFor="confirmPassword"
+          className="text-sm font-medium"
+          style={{ color: 'var(--text-2)' }}
+        >
           Confirmer le mot de passe
         </label>
         <input
@@ -167,23 +245,39 @@ export function SignupForm() {
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
         {state.status === 'error' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
+          <p
+            className="text-xs flex items-center gap-1"
+            style={{ color: 'var(--red)' }}
+          >
             {state.fieldErrors.confirmPassword}
           </p>
         )}
-        {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
-          </p>
-        )}
+        {state.status === 'password_mismatch' &&
+          state.fieldErrors?.confirmPassword && (
+            <p
+              className="text-xs flex items-center gap-1"
+              style={{ color: 'var(--red)' }}
+            >
+              {state.fieldErrors.confirmPassword}
+            </p>
+          )}
       </div>
 
       {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
-        </p>
-      )}
+      {state.status === 'error' &&
+        !state.fieldErrors?.confirmPassword &&
+        state.errorMessage && (
+          <p
+            className="text-sm text-center py-2 px-3 rounded-lg"
+            style={{
+              color: 'var(--red)',
+              backgroundColor: 'rgba(248,113,113,0.05)',
+              border: '1px solid rgba(248,113,113,0.15)',
+            }}
+          >
+            {state.errorMessage}
+          </p>
+        )}
 
       {/* Bouton submit */}
       <button
