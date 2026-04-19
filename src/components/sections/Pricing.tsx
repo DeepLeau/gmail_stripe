@@ -1,14 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+
+const STRIPE_PRICE_IDS: Record<string, string> = {
+  start: 'price_start',
+  scale: 'price_scale',
+  team: 'price_team',
+}
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    key: 'start',
+    name: 'Start',
+    price: '9',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour démarrer avec Emind et automatiser tes réponses.',
     features: [
       { text: '100 questions / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
@@ -17,25 +25,43 @@ const plans = [
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    key: 'scale',
+    name: 'Scale',
+    price: '29',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les équipes qui gèrent plusieurs boîtes email.',
+    features: [
+      { text: '500 questions / mois', included: true },
+      { text: '5 boîtes mail connectées', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    key: 'team',
+    name: 'Team',
+    price: '79',
+    period: 'mois',
+    description: 'Pour les équipes qui vivent dans leurs emails.',
     features: [
       { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Boîtes mail illimitées', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -53,13 +79,42 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+  const handlePlanClick = async (planKey: string) => {
+    if (loadingPlan) return
+
+    setLoadingPlan(planKey)
+
+    try {
+      const response = await fetch('/api/stripe/create-checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey }),
+      })
+
+      if (response.redirected) {
+        window.location.href = response.url
+      } else {
+        const data = await response.json()
+        if (data.url) {
+          window.location.href = data.url
+        }
+      }
+    } catch (error) {
+      console.error('Checkout error:', error)
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
       className="py-24 px-6"
       style={{ backgroundColor: 'var(--surface)' }}
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-14">
           <motion.div
@@ -102,7 +157,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence avec Start. Passe à Scale ou Team quand tu en as besoin.
           </motion.p>
         </div>
 
@@ -112,13 +167,13 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start"
         >
           {plans.map((plan, i) => (
             <motion.div
               key={i}
               variants={cardVariants}
-              className="relative rounded-xl p-8 flex flex-col gap-6"
+              className="relative rounded-xl p-6 flex flex-col gap-5"
               style={
                 plan.highlighted
                   ? {
@@ -134,7 +189,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for Scale */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -186,7 +241,7 @@ export function Pricing() {
                     className="text-sm"
                     style={{ color: 'var(--text-3)' }}
                   >
-                    / {plan.period}
+                    € / {plan.period}
                   </span>
                 </div>
               </div>
@@ -229,6 +284,8 @@ export function Pricing() {
 
               {/* CTA */}
               <button
+                onClick={() => handlePlanClick(plan.key)}
+                disabled={loadingPlan !== null}
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={
                   plan.highlighted
@@ -269,7 +326,14 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingPlan === plan.key ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin shrink-0" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}

@@ -1,11 +1,11 @@
 import { Navbar } from '@/components/ui/Navbar'
-import { Footer } from '@/components/ui/Footer'
+import { Footer } from '@/components/sections/Footer'
 import { Hero } from '@/components/sections/Hero'
-import { QuestionExamples } from '@/components/sections/QuestionExamples'
-import { HowItWorks } from '@/components/sections/HowItWorks'
+import { FeatureStrip } from '@/components/sections/FeatureStrip'
 import { Features } from '@/components/sections/Features'
-import { TrustSecurity } from '@/components/sections/TrustSecurity'
+import { Workflow } from '@/components/sections/Workflow'
 import { Pricing } from '@/components/sections/Pricing'
+import { FAQ } from '@/components/sections/FAQ'
 import { FinalCTA } from '@/components/sections/FinalCTA'
 
 export default function HomePage() {
@@ -13,11 +13,11 @@ export default function HomePage() {
     <main>
       <Navbar />
       <Hero />
-      <QuestionExamples />
-      <HowItWorks />
+      <FeatureStrip />
       <Features />
-      <TrustSecurity />
+      <Workflow />
       <Pricing />
+      <FAQ />
       <FinalCTA />
       <Footer />
     </main>

@@ -18,7 +18,12 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string
+  planId?: string
+}
+
+export function SignupForm({ sessionId, planId }: SignupFormProps = {}) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -31,7 +36,7 @@ export function SignupForm() {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -90,6 +95,22 @@ export function SignupForm() {
       return
     }
 
+    // Si session Stripe, enregistrer l'abonnement
+    if (sessionId) {
+      try {
+        await fetch('/api/subscription/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            stripe_session_id: sessionId,
+            plan_id: planId,
+          }),
+        })
+      } catch {
+        // Continue anyway - the webhook will handle it
+      }
+    }
+
     router.push('/chat')
   }
 
@@ -97,7 +118,7 @@ export function SignupForm() {
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
+        <label htmlFor="email" className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>
           Adresse email
         </label>
         <input
@@ -123,7 +144,7 @@ export function SignupForm() {
 
       {/* Champ mot de passe */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium text-[var(--text-2)]">
+        <label htmlFor="password" className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>
           Mot de passe
         </label>
         <input
@@ -149,7 +170,7 @@ export function SignupForm() {
 
       {/* Champ confirmation mot de passe */}
       <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirmPassword" className="text-sm font-medium text-[var(--text-2)]">
+        <label htmlFor="confirmPassword" className="text-sm font-medium" style={{ color: 'var(--text-2)' }}>
           Confirmer le mot de passe
         </label>
         <input

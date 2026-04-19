@@ -12,8 +12,8 @@ export function ChatMessageBubble({ message }: ChatMessageBubbleProps) {
       <div
         className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
           isUser
-            ? 'bg-blue-50 text-blue-800 rounded-br-md'
-            : 'bg-white border border-gray-200 text-gray-900 shadow-sm rounded-bl-md'
+            ? 'bg-[var(--accent-light)] text-[var(--accent-light-text)] rounded-br-md'
+            : 'bg-[var(--bg)] border border-[var(--border)] text-[var(--text)] shadow-sm rounded-bl-md'
         }`}
       >
         {message.content}

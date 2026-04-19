@@ -6,12 +6,121 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { AlertTriangle, Zap } from 'lucide-react'
+import Link from 'next/link'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  initialPlan?: string
+  initialMessagesRemaining?: number
+  initialMessagesLimit?: number
+}
+
+interface DecrementResponse {
+  allowed: boolean
+  remaining: number
+  limit?: number
+  plan?: string
+}
+
+function QuotaBanner({
+  plan,
+  messagesRemaining,
+  messagesLimit,
+  isWarning
+}: {
+  plan: string
+  messagesRemaining: number
+  messagesLimit: number
+  isWarning: boolean
+}) {
+  const usedMessages = messagesLimit - messagesRemaining
+  const usagePercent = messagesLimit > 0 ? (usedMessages / messagesLimit) * 100 : 0
+
+  const planLabels: Record<string, string> = {
+    start: 'Start',
+    scale: 'Scale',
+    team: 'Team',
+    free: 'Gratuit',
+  }
+
+  const planLabel = planLabels[plan] || plan.charAt(0).toUpperCase() + plan.slice(1)
+
+  return (
+    <div
+      className="shrink-0 flex items-center gap-3 px-4 py-2.5 rounded-lg border transition-colors duration-200"
+      style={{
+        backgroundColor: isWarning ? 'rgba(245, 158, 11, 0.08)' : 'var(--surface)',
+        borderColor: isWarning ? 'rgba(245, 158, 11, 0.2)' : 'var(--border)',
+      }}
+    >
+      <Zap
+        size={14}
+        strokeWidth={1.5}
+        style={{ color: isWarning ? '#f59e0b' : 'var(--accent)' }}
+      />
+      <span className="text-xs font-medium text-[var(--text-2)]">
+        Plan {planLabel} —{' '}
+        <span style={{ color: isWarning ? '#f59e0b' : 'var(--text)' }}>
+          {messagesRemaining} messages restants
+        </span>
+      </span>
+      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-300"
+          style={{
+            width: `${Math.min(usagePercent, 100)}%`,
+            backgroundColor: isWarning ? '#f59e0b' : 'var(--accent)',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function QuotaExceededBanner() {
+  return (
+    <div
+      className="shrink-0 flex items-center justify-between gap-4 px-4 py-3 rounded-lg border"
+      style={{
+        backgroundColor: 'rgba(239, 68, 68, 0.05)',
+        borderColor: 'rgba(239, 68, 68, 0.15)',
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <AlertTriangle size={18} strokeWidth={1.5} style={{ color: 'var(--red)' }} />
+        <span className="text-sm font-medium text-[var(--text)]">
+          Limite atteinte — Upgrade pour continuer
+        </span>
+      </div>
+      <Link
+        href="/#pricing"
+        className="h-8 px-4 flex items-center justify-center gap-2 rounded-lg text-xs font-medium transition-all duration-150"
+        style={{
+          backgroundColor: 'var(--accent)',
+          color: '#fff',
+        }}
+      >
+        Changer de plan
+      </Link>
+    </div>
+  )
+}
+
+export function ChatInterface({
+  initialPlan = 'free',
+  initialMessagesRemaining = 100,
+  initialMessagesLimit = 100,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [plan, setPlan] = useState(initialPlan)
+  const [messagesRemaining, setMessagesRemaining] = useState(initialMessagesRemaining)
+  const [messagesLimit] = useState(initialMessagesLimit)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const isQuotaExceeded = messagesRemaining <= 0
+  const isWarning = !isQuotaExceeded && messagesLimit > 0 && messagesRemaining <= Math.max(1, Math.floor(messagesLimit * 0.2))
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +131,42 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const handleDecrementAndCheck = async (): Promise<boolean> => {
+    try {
+      const res = await fetch('/api/messages/decrement', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      })
+
+      if (!res.ok) {
+        return true // Allow sending on error
+      }
+
+      const data: DecrementResponse = await res.json()
+
+      if (!data.allowed) {
+        setMessagesRemaining(0)
+        return false
+      }
+
+      setMessagesRemaining(data.remaining)
+      if (data.plan) setPlan(data.plan)
+      return true
+    } catch {
+      // On error, allow the message to be sent
+      return true
+    }
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isQuotaExceeded) return
+
+    // Check and decrement quota first
+    const allowed = await handleDecrementAndCheck()
+    if (!allowed) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -57,7 +197,19 @@ export function ChatInterface() {
   }
 
   return (
-    <div className="flex flex-col h-full py-6">
+    <div className="flex flex-col h-full py-6 gap-4">
+      {/* Quota Banner */}
+      {isQuotaExceeded ? (
+        <QuotaExceededBanner />
+      ) : (
+        <QuotaBanner
+          plan={plan}
+          messagesRemaining={messagesRemaining}
+          messagesLimit={messagesLimit}
+          isWarning={isWarning}
+        />
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -96,12 +248,13 @@ export function ChatInterface() {
       </div>
 
       {/* Input fixe en bas */}
-      <div className="shrink-0 pt-4">
+      <div className="shrink-0">
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={isQuotaExceeded}
         />
       </div>
     </div>
