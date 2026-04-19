@@ -74,6 +74,30 @@ export function UserMenu({ userEmail }: UserMenuProps) {
             <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
 
+          {/* Lien gestion du plan */}
+          <a
+            href="/settings/billing"
+            className="w-full flex items-center gap-2.5 px-3 h-9 text-sm
+                       text-[var(--text-2)] hover:bg-[var(--accent)]/8
+                       transition-colors duration-100 whitespace-nowrap"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={1.5}
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="shrink-0"
+            >
+              <rect x="2" y="4" width="20" height="16" rx="2" />
+              <path d="M2 10h20" />
+            </svg>
+            <span>Gérer mon plan</span>
+          </a>
+
           {/* Bouton déconnexion */}
           <button
             onClick={handleLogout}

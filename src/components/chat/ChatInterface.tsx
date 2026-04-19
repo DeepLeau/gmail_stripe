@@ -1,16 +1,38 @@
 'use client'
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
+import Link from 'next/link'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { AlertCircle } from 'lucide-react'
 
-export function ChatInterface() {
+const PLAN_DISPLAY_NAMES: Record<string, string> = {
+  start: 'Start',
+  scale: 'Scale',
+  team: 'Team',
+}
+
+type ChatInterfaceProps = {
+  messagesLimit: number
+  messagesUsed: number
+  plan?: string
+}
+
+export function ChatInterface({
+  messagesLimit,
+  messagesUsed: initialMessagesUsed,
+  plan = 'start',
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [quotaExceeded, setQuotaExceeded] = useState(false)
+  const [messagesRemaining, setMessagesRemaining] = useState(
+    Math.max(0, messagesLimit - initialMessagesUsed)
+  )
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,11 +44,45 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  async function checkQuota(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/billing/quota', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'decrement' }),
+      })
+
+      if (!res.ok) {
+        // Network error — fail open but log
+        console.error('[ChatInterface] Quota check failed:', res.status)
+        return true
+      }
+
+      const data = await res.json()
+      setMessagesRemaining(data.messages_remaining ?? 0)
+
+      if (!data.allowed) {
+        setQuotaExceeded(true)
+        return false
+      }
+
+      return true
+    } catch (err) {
+      console.error('[ChatInterface] Quota check error:', err)
+      // Fail open on error — allow the message to be sent
+      return true
+    }
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Check quota before sending
+    const allowed = await checkQuota()
+    if (!allowed) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -50,7 +106,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -62,9 +118,13 @@ export function ChatInterface() {
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+            <div
+              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
+              style={{ backgroundColor: 'var(--accent-light)' }}
+            >
               <svg
-                className="w-5 h-5 text-blue-600"
+                className="w-5 h-5"
+                style={{ color: 'var(--accent)' }}
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -77,10 +137,13 @@ export function ChatInterface() {
                 />
               </svg>
             </div>
-            <p className="text-sm font-medium text-gray-900 mb-1">
+            <p
+              className="text-sm font-medium mb-1"
+              style={{ color: 'var(--text)' }}
+            >
               Pose tes questions à tes emails
             </p>
-            <p className="text-xs text-gray-500 max-w-xs">
+            <p className="text-xs max-w-xs" style={{ color: 'var(--text-2)' }}>
               Dicte une question en langage naturel. L&apos;IA explore tes emails et te répond.
             </p>
           </div>
@@ -91,6 +154,41 @@ export function ChatInterface() {
         ))}
 
         {isLoading && <TypingIndicator />}
+
+        {/* Quota exceeded banner */}
+        {quotaExceeded && (
+          <div
+            className="flex items-start gap-3 px-4 py-3 rounded-lg mx-auto max-w-sm"
+            style={{
+              backgroundColor: 'var(--accent-glow)',
+              border: '1px solid var(--accent)',
+            }}
+          >
+            <AlertCircle
+              size={15}
+              className="mt-0.5 shrink-0"
+              style={{ color: 'var(--accent)' }}
+              strokeWidth={1.5}
+            />
+            <div>
+              <p className="text-sm font-medium" style={{ color: 'var(--accent-hi)' }}>
+                Limite atteinte
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--accent-hi)', opacity: 0.8 }}>
+                Tu as utilisé les {messagesLimit} messages de ton plan{' '}
+                {PLAN_DISPLAY_NAMES[plan] ?? plan}.{' '}
+                <Link
+                  href="/settings/billing"
+                  className="underline font-medium"
+                  style={{ color: 'var(--accent-hi)' }}
+                >
+                  Upgradé ton plan
+                </Link>{' '}
+                pour continuer.
+              </p>
+            </div>
+          </div>
+        )}
 
         <div ref={messagesEndRef} />
       </div>

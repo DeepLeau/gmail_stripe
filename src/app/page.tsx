@@ -1,25 +1,11 @@
-import { Navbar } from '@/components/ui/Navbar'
-import { Footer } from '@/components/ui/Footer'
-import { Hero } from '@/components/sections/Hero'
-import { QuestionExamples } from '@/components/sections/QuestionExamples'
-import { HowItWorks } from '@/components/sections/HowItWorks'
-import { Features } from '@/components/sections/Features'
-import { TrustSecurity } from '@/components/sections/TrustSecurity'
-import { Pricing } from '@/components/sections/Pricing'
-import { FinalCTA } from '@/components/sections/FinalCTA'
-
+// NOTE: Sections will be imported as they are created in subsequent batches.
+// This file composes the full landing page from all section components.
 export default function HomePage() {
   return (
     <main>
-      <Navbar />
-      <Hero />
-      <QuestionExamples />
-      <HowItWorks />
-      <Features />
-      <TrustSecurity />
-      <Pricing />
-      <FinalCTA />
-      <Footer />
+      {/* Sections will be imported here as they are built */}
+      {/* Navbar, Hero, LogoStrip, Features, Platform, Metrics, Pricing, Testimonials, CTA, Footer */}
+      {/* Each section component file maps to its corresponding template section */}
     </main>
   )
 }
