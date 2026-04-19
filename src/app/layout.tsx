@@ -1,29 +1,37 @@
 import type { Metadata } from 'next'
-import { Inter, Space_Mono } from 'next/font/google'
+import { Space_Grotesk, Inter, IBM_Plex_Mono } from 'next/font/google'
 import './globals.css'
 
-const inter = Inter({
+const spaceGrotesk = Space_Grotesk({
   subsets: ['latin'],
-  variable: '--font-inter',
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-display',
   display: 'swap',
 })
 
-const spaceMono = Space_Mono({
+const inter = Inter({
   subsets: ['latin'],
-  weight: ['400', '700'],
-  variable: '--font-space-mono',
+  weight: ['400', '500', '600'],
+  variable: '--font-body',
+  display: 'swap',
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
   display: 'swap',
 })
 
 export const metadata: Metadata = {
-  title: 'Emind — Pose tes questions à tes emails',
+  title: 'MessageMind | Choose your plan. Chat away.',
   description:
-    'Emind connecte ta boîte mail à une IA qui lit, comprend et mémorise tes emails. Pose une question en langage naturel, obtiens une réponse précise.',
-  keywords: ['email', 'IA', 'assistant email', 'productivité', 'Gmail', 'Outlook'],
+    'MessageMind vous donne le quota de messages qu\'il vous faut — facturé mensuellement, upgradable à tout moment, résiliable quand vous voulez.',
+  keywords: ['messages', 'chat', 'IA', 'email', 'SaaS', 'subscription'],
   openGraph: {
-    title: 'Emind — Pose tes questions à tes emails',
+    title: 'MessageMind | Choose your plan. Chat away.',
     description:
-      'Tes emails savent tout. Maintenant tu peux leur parler.',
+      'Le service de chat intelligent avec les quotas adaptés à votre usage.',
     type: 'website',
   },
 }
@@ -36,7 +44,7 @@ export default function RootLayout({
   return (
     <html
       lang="fr"
-      className={`${inter.variable} ${spaceMono.variable}`}
+      className={`${spaceGrotesk.variable} ${inter.variable} ${ibmPlexMono.variable}`}
     >
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -45,28 +53,8 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
-        {/* SVG noise filter */}
-        <svg className="noise-filter" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="glass-noise">
-              <feTurbulence
-                type="fractalNoise"
-                baseFrequency="0.75"
-                numOctaves="4"
-                stitchTiles="stitch"
-              />
-              <feColorMatrix type="saturate" values="0" />
-              <feBlend
-                in="SourceGraphic"
-                mode="overlay"
-                result="blend"
-              />
-              <feComposite in="blend" in2="SourceGraphic" operator="in" />
-            </filter>
-          </defs>
-        </svg>
       </head>
-      <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
+      <body className="font-body bg-canvas text-graphite-900 antialiased selection:bg-amber selection:text-white relative overflow-x-hidden">
         {children}
       </body>
     </html>
