@@ -57,13 +57,13 @@ export function Navbar() {
           {/* CTA buttons */}
           <div className="hidden md:flex items-center gap-2 flex-shrink-0">
             <a
-              href="#"
+              href="/login"
               className="h-8 px-3 flex items-center justify-center text-sm text-[var(--text-2)] hover:text-[var(--text)] transition-colors duration-150 rounded-md border border-transparent hover:border-[var(--border)]"
             >
               Se connecter
             </a>
             <a
-              href="#pricing"
+              href="/signup"
               className="h-9 px-4 flex items-center justify-center rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors duration-150 shadow-sm gap-1.5"
             >
               Commencer

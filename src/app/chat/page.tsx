@@ -1,13 +1,25 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { UserMenu } from '@/components/ui/UserMenu'
+import { createClient } from '@/lib/supabase/server'
 
-export default function ChatPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function ChatPage() {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  const userEmail = user?.email ?? ''
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
-      <header className="shrink-0 flex items-center justify-center h-14 border-b border-gray-100">
+      <header className="shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-900 tracking-tight">
           Emind
         </span>
+        {userEmail && <UserMenu userEmail={userEmail} />}
       </header>
 
       {/* Zone de chat */}

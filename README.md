@@ -11,6 +11,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Gmail & Outlook integration** — Connect your inbox in one click
 - **Secure data handling** — Encrypted storage, no data resale, revocable access
 - **AI Chat Interface** — Clean, modern chat experience at `/chat` with typing indicators and auto-scroll
+- **User Authentication** — Sign up and log in to access your personal chat
 
 ## 🛠️ Tech Stack
 
@@ -20,6 +21,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
 - **UI Utilities**: clsx, tailwind-merge, class-variance-authority
+- **Auth**: Supabase Authentication
 
 ## 🚀 Quick Start
 
@@ -52,7 +54,29 @@ npm install
 
 This will install all the packages listed in `package.json`.
 
-### 3. Run the development server
+### 3. Set up environment variables
+
+Create a file named `.env.local` in the root of your project (same folder as `package.json`). This file stores sensitive settings that your app needs to connect to external services.
+
+Add the following content to `.env.local`:
+
+```bash
+# Supabase Configuration
+# Find these in: Supabase Dashboard > Project Settings > API
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+```
+
+**How to find your Supabase credentials:**
+
+1. Go to [Supabase](https://supabase.com/) and log in
+2. Select your project
+3. Click **Project Settings** (the gear icon) in the left sidebar
+4. Click **API**
+5. Copy the **Project URL** and paste it as `NEXT_PUBLIC_SUPABASE_URL`
+6. Copy the **anon/public key** and paste it as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### 4. Run the development server
 
 ```bash
 npm run dev
@@ -67,9 +91,16 @@ After a few seconds, you'll see:
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the landing page.
 
-### 4. Try the AI Chat
+### 5. Create an account
 
-Visit [http://localhost:3000/chat](http://localhost:3000/chat) to experience the new chat interface. Type a message and press Enter or click the send button to see the mock AI response.
+Visit [http://localhost:3000/signup](http://localhost:3000/signup) to create your account. After signing up, you'll be automatically redirected to the chat page.
+
+## 🔑 Environment Variables
+
+| Variable | Required | Where to find it | Description |
+|----------|----------|------------------|-------------|
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard → Project Settings → API → Project URL | Your Supabase project connection URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard → Project Settings → API → Project API Keys → anon/public | Public API key for Supabase client authentication |
 
 ## 📁 Project Structure
 
@@ -79,62 +110,66 @@ my-app/
 │   ├── app/                    # Next.js App Router — pages and layout
 │   │   ├── globals.css         # Global styles and Tailwind imports
 │   │   ├── layout.tsx          # Root layout (fonts, metadata)
-│   │   ├── page.tsx           # Home page — landing page
-│   │   └── chat/
-│   │       └── page.tsx       # AI Chat page at /chat
+│   │   ├── page.tsx            # Home page — landing page
+│   │   ├── login/
+│   │   │   └── page.tsx        # Login page at /login
+│   │   ├── signup/
+│   │   │   └── page.tsx        # Signup page at /signup
+│   │   ├── chat/
+│   │   │   └── page.tsx        # AI Chat page at /chat (protected)
+│   │   └── actions/
+│   │       └── auth.ts         # Server-side authentication actions
 │   ├── components/
-│   │   ├── ui/                # Reusable UI components
-│   │   │   ├── Navbar.tsx     # Top navigation bar
-│   │   │   └── Footer.tsx     # Page footer
-│   │   ├── sections/          # Landing page sections
-│   │   │   ├── Hero.tsx       # Hero with headline and CTA
-│   │   │   ├── QuestionExamples.tsx  # Example questions showcase
-│   │   │   ├── HowItWorks.tsx # 3-step explanation
-│   │   │   ├── Features.tsx   # Feature cards grid
-│   │   │   ├── TrustSecurity.tsx  # Security & trust badges
-│   │   │   ├── Pricing.tsx    # Free vs Pro pricing
-│   │   │   └── FinalCTA.tsx  # Final call-to-action
-│   │   └── chat/              # Chat interface components
-│   │       ├── ChatInterface.tsx  # Main chat container
-│   │       ├── ChatMessage.tsx    # Individual message bubble
-│   │       ├── ChatInput.tsx      # Auto-expanding text input
-│   │       └── TypingIndicator.tsx # Three-dot loading animation
-│   └── lib/
-│       ├── utils.ts           # Utility functions (cn helper)
-│       ├── data.ts            # Static data (questions, features)
-│       └── chat/
-│           ├── types.ts       # Chat message type definitions
-│           ├── responses.ts   # Mock AI response pool
-│           └── mockApi.ts     # Mock API with random response delay
+│   │   ├── ui/                 # Reusable UI components
+│   │   │   ├── Navbar.tsx      # Top navigation bar
+│   │   │   ├── Footer.tsx      # Page footer
+│   │   │   └── UserMenu.tsx    # User dropdown menu with logout
+│   │   ├── auth/               # Authentication components
+│   │   │   ├── AuthCard.tsx    # Shared auth card wrapper
+│   │   │   ├── LoginForm.tsx   # Login form component
+│   │   │   └── SignupForm.tsx  # Signup form component
+│   │   └── sections/           # Landing page sections
+│   ├── lib/
+│   │   └── supabase/
+│   │       ├── client.ts       # Supabase client for browser
+│   │       └── server.ts       # Supabase client for server
+│   └── middleware.ts           # Next.js middleware for route protection
+├── public/                     # Static assets
+├── tailwind.config.ts          # Tailwind CSS configuration
+├── next.config.mjs             # Next.js configuration
+└── package.json                # Dependencies and scripts
 ```
 
-## 🤖 Chat Feature Architecture
-
-The `/chat` page uses a mock API system designed for easy replacement with a real API later:
+### Key Files for Authentication
 
 | File | Purpose |
 |------|---------|
-| `src/lib/chat/types.ts` | TypeScript interfaces for messages |
-| `src/lib/chat/responses.ts` | Pool of generic AI responses |
-| `src/lib/chat/mockApi.ts` | Mock API function (replace with real API call) |
-| `src/components/chat/` | UI components for the chat interface |
-
-To connect a real AI API later, simply update the `sendMessage` function in `ChatInterface.tsx` to call your API endpoint instead of `mockApi.sendMessage()`.
+| `src/app/login/page.tsx` | Login page with email/password form |
+| `src/app/signup/page.tsx` | Signup page with email/password form |
+| `src/components/auth/LoginForm.tsx` | Login form component |
+| `src/components/auth/SignupForm.tsx` | Signup form component |
+| `src/middleware.ts` | Protects `/chat` route — redirects unauthenticated users to `/login` |
+| `src/lib/supabase/client.ts` | Browser-side Supabase client |
+| `src/lib/supabase/server.ts` | Server-side Supabase client |
+| `src/app/actions/auth.ts` | Server actions for sign up, sign in, sign out |
+| `src/components/ui/UserMenu.tsx` | User dropdown with logout button |
 
 ## 🚀 Deploy to Vercel
+
+The easiest way to deploy your Emind app:
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
 ### Step by step:
 
-1. **Import your repository** — Click "Import Project" on Vercel, select your GitHub repo
-2. **Configure project** — Vercel auto-detects Next.js settings (no changes needed)
-3. **Add environment variables** — If you add any later (e.g., API keys), add them in Vercel > Settings > Environment Variables
-4. **Deploy** — Click "Deploy" and wait ~1 minute
+1. **Import your repository** — Click "Import Git Repository" and select your GitHub repo
+2. **Configure environment variables** — In Vercel dashboard, go to **Settings → Environment Variables** and add:
+   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase anon key
+3. **Deploy** — Click "Deploy" and wait for the build to complete
+4. **Test** — Visit your deployed URL and verify the login/signup flow works
 
-Your app will be live at `https://your-project.vercel.app` with the chat available at `/chat`.
-
-> 💡 **Tip**: After deploying, test the `/chat` page to ensure the chat interface works correctly in production.
+> ⚠️ **Important**: Make sure to add both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables in Vercel, otherwise authentication won't work on the deployed site.
 
 ## 📝 License
 
