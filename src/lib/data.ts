@@ -25,11 +25,16 @@ export type TrustItem = {
   icon: string
 }
 
+export type PlanFeatureItem = {
+  text: string
+  included: boolean
+}
+
 export type Plan = {
   name: string
   price: string
   description: string
-  features: string[]
+  features: PlanFeatureItem[]
   cta: string
   highlighted: boolean
 }
@@ -162,10 +167,12 @@ export const plans: Plan[] = [
     price: "0",
     description: "Pour découvrir Emind et automiser vos réponses email.",
     features: [
-      "100 questions/mois",
-      "1 boîte email connectée",
-      "Réponses en 10 secondes",
-      "Support par email",
+      { text: "100 questions/mois", included: true },
+      { text: "1 boîte email connectée", included: true },
+      { text: "Réponses en 10 secondes", included: true },
+      { text: "Support par email", included: true },
+      { text: "Multi-comptes", included: false },
+      { text: "Priorité de traitement", included: false },
     ],
     cta: "Commencer gratuitement",
     highlighted: false,
@@ -175,11 +182,12 @@ export const plans: Plan[] = [
     price: "29",
     description: "Pour les professionals qui gèrent plusieurs boîtes email.",
     features: [
-      "Questions illimitées",
-      "Boîtes email illimitées",
-      "Priorité de traitement",
-      "Réponses en 3 secondes",
-      "Support prioritaire",
+      { text: "Questions illimitées", included: true },
+      { text: "Boîtes email illimitées", included: true },
+      { text: "Priorité de traitement", included: true },
+      { text: "Réponses en 3 secondes", included: true },
+      { text: "Support prioritaire", included: true },
+      { text: "Multi-comptes", included: false },
     ],
     cta: "Passer Pro",
     highlighted: true,
