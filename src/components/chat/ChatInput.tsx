@@ -41,7 +41,6 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
       e.preventDefault()
       if (value.trim() && !isLoading) {
         onSubmit()
-        // Reset textarea après envoi
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
           textareaRef.current.style.overflowY = 'hidden'
