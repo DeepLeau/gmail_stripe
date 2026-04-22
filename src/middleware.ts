@@ -52,6 +52,11 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     url.searchParams.set('redirectTo', pathname)
+    // Preserve session_id so Stripe checkout flow survives middleware redirect
+    const sessionId = request.nextUrl.searchParams.get('session_id')
+    if (sessionId) {
+      url.searchParams.set('session_id', sessionId)
+    }
     return NextResponse.redirect(url, 302)
   }
 
