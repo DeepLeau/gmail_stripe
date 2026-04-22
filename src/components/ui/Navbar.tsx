@@ -120,7 +120,7 @@ export function Navbar() {
                 Se connecter
               </a>
               <a
-                href="#pricing"
+                href="/pricing"
                 onClick={() => setMenuOpen(false)}
                 className="px-4 py-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors"
               >

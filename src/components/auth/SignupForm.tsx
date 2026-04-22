@@ -15,10 +15,14 @@ type SignupFormState = {
   }
 }
 
+interface SignupFormProps {
+  stripeSessionId?: string
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ stripeSessionId }: SignupFormProps = {}) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -31,7 +35,7 @@ export function SignupForm() {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -88,6 +92,23 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // If there's a Stripe session, link it after signup
+    if (stripeSessionId) {
+      try {
+        await fetch('/api/subscriptions/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: stripeSessionId,
+            userId: supabase.auth.getUser ? (await supabase.auth.getUser()).data.user?.id : undefined,
+          }),
+        })
+      } catch {
+        // Non-blocking — subscription link can be retried
+        console.warn('[SignupForm] Failed to link Stripe session:', stripeSessionId)
+      }
     }
 
     router.push('/chat')
@@ -190,9 +211,9 @@ export function SignupForm() {
         type="submit"
         disabled={isLoading}
         className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
-                   bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
-                   text-sm font-medium transition-colors duration-150
-                   disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+                  bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
+                  text-sm font-medium transition-colors duration-150
+                  disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
         {isLoading ? (
           <>
