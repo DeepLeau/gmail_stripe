@@ -15,10 +15,14 @@ type SignupFormState = {
   }
 }
 
+type SignupFormProps = {
+  sessionId?: string
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ sessionId }: SignupFormProps = {}) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -64,6 +68,23 @@ export function SignupForm() {
     return true
   }
 
+  async function linkSession(userId: string) {
+    if (!sessionId) return
+    try {
+      const ctrl = new AbortController()
+      const timeout = setTimeout(() => ctrl.abort(), 5000)
+      await fetch('/api/subscription/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId, userId }),
+        signal: ctrl.signal,
+      })
+      clearTimeout(timeout)
+    } catch {
+      // Linking failed silently — user can retry later
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -77,7 +98,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -88,6 +109,11 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Attempt linking before navigating to chat
+    if (data.user?.id) {
+      await linkSession(data.user.id)
     }
 
     router.push('/chat')

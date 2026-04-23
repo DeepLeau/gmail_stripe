@@ -11,6 +11,7 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -26,7 +27,18 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached) return
+
+    // Decrement message count before sending
+    try {
+      const res = await fetch('/api/subscription/decrement', { method: 'POST' })
+      if (res.status === 429 || (res.ok && !(await res.json()).success)) {
+        setLimitReached(true)
+        return
+      }
+    } catch {
+      // Network error — proceed without decrement check
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -58,6 +70,31 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Bannière limite atteinte */}
+      {limitReached && (
+        <div
+          className="shrink-0 mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-sm"
+          style={{
+            backgroundColor: 'var(--accent-light)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+          }}
+        >
+          <span style={{ color: 'var(--accent)' }}>
+            Limite atteinte — upgrade vers plan supérieur
+          </span>
+          <a
+            href="/pricing"
+            className="shrink-0 px-3 py-1 rounded-lg text-xs font-medium"
+            style={{
+              backgroundColor: 'var(--accent)',
+              color: '#fff',
+            }}
+          >
+            Modifier mon plan
+          </a>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
