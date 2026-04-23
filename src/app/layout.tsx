@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
 import './globals.css'
+import { cookies } from 'next/headers'
+import ChatHeader from '@/components/chat-header'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -28,11 +30,15 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const cookieStore = await cookies()
+  const userEmail = cookieStore.get('user_email')?.value
+  const userPlan = cookieStore.get('user_plan')?.value
+
   return (
     <html
       lang="fr"
@@ -67,6 +73,8 @@ export default function RootLayout({
         </svg>
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
+        {/* Chat layout gating: only show header on chat pages */}
+        <ChatHeader userEmail={userEmail} />
         {children}
       </body>
     </html>
