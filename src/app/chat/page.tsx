@@ -1,4 +1,5 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { SubscriptionBadge } from '@/components/chat/SubscriptionBadge'
 import { UserMenu } from '@/components/ui/UserMenu'
 import { createClient } from '@/lib/supabase/server'
 
@@ -16,9 +17,12 @@ export default async function ChatPage() {
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
       <header className="shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-900 tracking-tight">
-          Emind
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-semibold text-gray-900 tracking-tight">
+            Emind
+          </span>
+          <SubscriptionBadge />
+        </div>
         {userEmail && <UserMenu userEmail={userEmail} />}
       </header>
 

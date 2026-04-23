@@ -1,7 +1,8 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
 
 const plans = [
   {
@@ -52,14 +53,53 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
+async function createCheckoutSession(planName: string): Promise<string | null> {
+  const planIdMap: Record<string, string> = {
+    Free: 'free',
+    Pro: 'pro',
+  }
+  const planId = planIdMap[planName]
+  if (!planId) return null
+
+  try {
+    const response = await fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId }),
+    })
+    if (!response.ok) return null
+    const data = await response.json()
+    return (data as { url?: string }).url ?? null
+  } catch {
+    return null
+  }
+}
+
 export function Pricing() {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+  async function handleSelectPlan(planName: string) {
+    if (loadingPlan) return
+    setLoadingPlan(planName)
+    try {
+      const url = await createCheckoutSession(planName)
+      if (url) {
+        window.location.href = url
+      }
+    } catch (error) {
+      console.error('Failed to create checkout session:', error)
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
       className="py-24 px-6"
       style={{ backgroundColor: 'var(--surface)' }}
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-14">
           <motion.div
@@ -102,7 +142,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Débloque plus de messages quand tu en as besoin.
           </motion.p>
         </div>
 
@@ -134,7 +174,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted plan */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -175,7 +215,7 @@ export function Pricing() {
                 </p>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
+                <div className="flex items-baseline gap-1.5 mb-2">
                   <span
                     className="text-4xl font-bold tracking-tight"
                     style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
@@ -189,6 +229,16 @@ export function Pricing() {
                     / {plan.period}
                   </span>
                 </div>
+
+                {/* Messages count */}
+                {'messages' in plan && (
+                  <p
+                    className="text-xs font-medium"
+                    style={{ color: 'var(--text-3)' }}
+                  >
+                    {(plan as { messages?: number }).messages} messages / mois
+                  </p>
+                )}
               </div>
 
               {/* Divider */}
@@ -243,13 +293,15 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                disabled={loadingPlan !== null}
+                onClick={() => handleSelectPlan(plan.name)}
                 onMouseEnter={(e) => {
-                  if (plan.highlighted) {
+                  if (plan.highlighted && loadingPlan !== plan.name) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
                       'var(--accent-hi)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform =
                       'translateY(-1px)'
-                  } else {
+                  } else if (!plan.highlighted && loadingPlan !== plan.name) {
                     ;(e.currentTarget as HTMLButtonElement).style.borderColor =
                       'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.color =
@@ -269,11 +321,37 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingPlan === plan.name ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin shrink-0" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Free tier note */}
+        <motion.p
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5, delay: 0.3 }}
+          className="text-xs text-center mt-8"
+          style={{ color: 'var(--text-3)' }}
+        >
+          Tu peux continuer gratuitement avec des fonctionnalités limitées.{' '}
+          <a
+            href="/signup"
+            className="underline underline-offset-2 hover:opacity-80 transition-opacity duration-150"
+            style={{ color: 'var(--accent)' }}
+          >
+            Créer un compte gratuit
+          </a>
+        </motion.p>
       </div>
     </section>
   )

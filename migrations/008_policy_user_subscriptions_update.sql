@@ -1,0 +1,16 @@
+-- =====================================================
+-- MIGRATION 08: RLS policy — UPDATE (SUPPRIMÉE)
+--
+-- CETTE POLICY A ÉTÉ SUPPRIMÉE.
+-- Raison : avec USING/WITH CHECK (auth.uid() = user_id),
+-- tout user authentifié pouvait modifier directement
+-- plan, subscription_status, messages_limit, messages_used
+-- — bypass complet du webhook Stripe et du RPC
+-- apply_subscription_change. Contre l'intention documentée.
+--
+-- Toutes les modifications passent par :
+-- - apply_subscription_change (service_role) pour les changements de plan
+-- - decrement_message_count (SECURITY DEFINER) pour messages_used
+-- Aucune policy UPDATE côté client = UPDATE bloqué pour les clients.
+-- =====================================================
+DROP POLICY IF EXISTS user_subscriptions_authenticated_update ON public.user_subscriptions;

@@ -1,0 +1,15 @@
+-- =====================================================
+-- MIGRATION 07: RLS policy — INSERT (SUPPRIMÉE)
+--
+-- CETTE POLICY A ÉTÉ SUPPRIMÉE.
+-- Raison : avec WITH CHECK (auth.uid() = user_id), tout user
+-- authentifié pouvait créer une subscription arbitraire
+-- (plan='team', status='active') sans passer par le webhook
+-- Stripe — contournement du contrôle métier.
+--
+-- Les insertions sont réservées à apply_subscription_change
+-- via service_role (SECURITY DEFINER bypass RLS).
+-- Si une policy INSERT côté client devenait nécessaire,
+-- utiliser WITH CHECK (false) ou ne pas créer de policy.
+-- =====================================================
+DROP POLICY IF EXISTS user_subscriptions_authenticated_insert ON public.user_subscriptions;

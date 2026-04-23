@@ -2,15 +2,17 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendMessage, type LimitReachedResult } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { LimitReachedBanner } from './LimitReachedBanner'
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -42,10 +44,14 @@ export function ChatInterface() {
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
+      if ((response as LimitReachedResult).limitReached === true) {
+        setLimitReached(true)
+        return
+      }
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response as string,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
@@ -94,6 +100,14 @@ export function ChatInterface() {
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Limit reached banner */}
+      <LimitReachedBanner
+        visible={limitReached}
+        planName="ton plan"
+        messagesLimit={0}
+        onDismiss={() => setLimitReached(false)}
+      />
 
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
