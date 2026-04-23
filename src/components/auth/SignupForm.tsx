@@ -2,11 +2,12 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Zap } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch' | 'success'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -90,7 +91,51 @@ export function SignupForm() {
       return
     }
 
-    router.push('/chat')
+    setState({ status: 'success' })
+  }
+
+  if (state.status === 'success') {
+    return (
+      <div className="flex flex-col gap-6 py-4">
+        {/* Success message */}
+        <div className="flex flex-col items-center text-center gap-3 p-6 rounded-xl bg-green-50 border border-green-100">
+          <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+            <Zap size={20} className="text-green-600" />
+          </div>
+          <div>
+            <p className="font-semibold text-gray-900 mb-1">Compte créé avec succès !</p>
+            <p className="text-sm text-gray-600">
+              Tu peux maintenant accéder au chat et poser tes premières questions.
+            </p>
+          </div>
+        </div>
+
+        {/* CTA to choose plan */}
+        <div className="flex flex-col gap-3">
+          <p className="text-sm text-center text-gray-600">
+            Débloque plus de questions en souscrivant à un plan :
+          </p>
+          <Link
+            href="/#pricing"
+            className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
+                       bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
+                       text-sm font-medium transition-colors duration-150"
+          >
+            <Zap size={14} />
+            <span>Voir les plans disponibles</span>
+          </Link>
+          <button
+            onClick={() => router.push('/chat')}
+            className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
+                       bg-[var(--bg)] border border-[var(--border-md)] text-[var(--text-2)]
+                       text-sm font-medium transition-colors duration-150
+                       hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          >
+            Aller au chat directement
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (

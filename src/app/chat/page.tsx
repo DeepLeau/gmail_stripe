@@ -1,5 +1,4 @@
-import { ChatInterface } from '@/components/chat/ChatInterface'
-import { UserMenu } from '@/components/ui/UserMenu'
+import { ChatPageContent } from '@/components/chat/ChatPageContent'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -11,23 +10,36 @@ export default async function ChatPage() {
   } = await supabase.auth.getUser()
 
   const userEmail = user?.email ?? ''
+  const userId = user?.id ?? null
+
+  // Fetch user subscription status
+  let subscription = null
+  let usage = null
+
+  if (userId) {
+    const { data: subData } = await supabase
+      .from('subscriptions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('status', 'active')
+      .single()
+
+    subscription = subData
+
+    const { data: usageData } = await supabase
+      .from('usage')
+      .select('*')
+      .eq('user_id', userId)
+      .single()
+
+    usage = usageData
+  }
 
   return (
-    <main className="flex flex-col h-screen bg-white">
-      {/* Header discret */}
-      <header className="shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100">
-        <span className="text-sm font-semibold text-gray-900 tracking-tight">
-          Emind
-        </span>
-        {userEmail && <UserMenu userEmail={userEmail} />}
-      </header>
-
-      {/* Zone de chat */}
-      <div className="flex-1 overflow-hidden">
-        <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
-        </div>
-      </div>
-    </main>
+    <ChatPageContent
+      userEmail={userEmail}
+      subscription={subscription}
+      usage={usage}
+    />
   )
 }
