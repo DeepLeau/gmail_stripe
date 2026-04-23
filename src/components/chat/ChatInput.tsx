@@ -8,9 +8,10 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, disabled = false }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -39,9 +40,8 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading) {
+      if (value.trim() && !isLoading && !disabled) {
         onSubmit()
-        // Reset textarea après envoi
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
           textareaRef.current.style.overflowY = 'hidden'
@@ -50,18 +50,20 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
     }
   }
 
-  const isDisabled = isLoading || !value.trim()
+  const handleSubmit = (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (value.trim() && !isLoading && !disabled) {
+      onSubmit()
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+        textareaRef.current.style.overflowY = 'hidden'
+      }
+    }
+  }
 
   return (
     <form
-      onSubmit={(e) => {
-        e.preventDefault()
-        if (!isDisabled) onSubmit()
-        if (textareaRef.current) {
-          textareaRef.current.style.height = 'auto'
-          textareaRef.current.style.overflowY = 'hidden'
-        }
-      }}
+      onSubmit={handleSubmit}
       className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
     >
       <textarea
@@ -71,7 +73,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
         onKeyDown={handleKeyDown}
         placeholder="Pose une question..."
         rows={1}
-        disabled={isLoading}
+        disabled={isLoading || disabled}
         className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
         style={{
           height: 'auto',
@@ -82,7 +84,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
 
       <button
         type="submit"
-        disabled={isDisabled}
+        disabled={!value.trim() || isLoading || disabled}
         className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
         aria-label="Envoyer"
       >

@@ -1,12 +1,12 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Loader2, AlertCircle, Link2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch' | 'linked' | 'linking'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -20,12 +20,61 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [stripeCustomerId, setStripeCustomerId] = useState<string | null>(null)
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
+
+  // Extract Stripe session from URL params
+  useEffect(() => {
+    const sessionId = searchParams.get('session_id')
+    if (sessionId) {
+      // Store the session_id for linking after signup
+      sessionStorage.setItem('pending_stripe_session', sessionId)
+      // Clean URL without reload
+      window.history.replaceState({}, '', '/signup')
+    }
+
+    const pendingSession = sessionStorage.getItem('pending_stripe_session')
+    if (pendingSession) {
+      setStripeCustomerId(pendingSession)
+    }
+  }, [searchParams])
+
+  // Link existing Stripe customer to new user account
+  const linkStripeCustomer = useCallback(async (userId: string, customerId: string) => {
+    setState({ status: 'linking' })
+
+    try {
+      const response = await fetch('/api/stripe/link-customer', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId,
+          stripeCustomerId: customerId,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Erreur lors de la liaison du compte Stripe')
+      }
+
+      // Clear pending session
+      sessionStorage.removeItem('pending_stripe_session')
+      setState({ status: 'linked' })
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue'
+      setState({ status: 'error', errorMessage: message })
+      return false
+    }
+  }, [])
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -77,7 +126,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -90,11 +139,36 @@ export function SignupForm() {
       return
     }
 
+    // If we have a pending Stripe customer and user was created
+    if (stripeCustomerId && data.user) {
+      const linked = await linkStripeCustomer(data.user.id, stripeCustomerId)
+      if (linked) {
+        router.push('/chat')
+        return
+      }
+      // If linking failed, still go to chat but user might need to re-link
+      router.push('/chat')
+      return
+    }
+
     router.push('/chat')
   }
 
+  // Show linking indicator if Stripe session is pending
+  const hasPendingStripeSession = !!stripeCustomerId
+
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Stripe Linking Indicator */}
+      {hasPendingStripeSession && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/15">
+          <Link2 size={16} className="shrink-0 text-[var(--accent)]" />
+          <p className="text-xs text-[var(--text-2)]">
+            Votre compte sera lié à votre abonnement Stripe après l&apos;inscription
+          </p>
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -180,9 +254,18 @@ export function SignupForm() {
 
       {/* Message d'erreur global */}
       {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
-        </p>
+        <div className="flex items-center gap-2 text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+          <AlertCircle size={14} className="shrink-0" />
+          <span>{state.errorMessage}</span>
+        </div>
+      )}
+
+      {/* Loading state for linking */}
+      {state.status === 'linking' && (
+        <div className="flex items-center gap-2 text-sm text-[var(--accent)] text-center py-2 px-3 rounded-lg bg-[var(--accent)]/5 border border-[var(--accent)]/15">
+          <Loader2 size={14} className="shrink-0 animate-spin" />
+          <span>Liaison de votre abonnement en cours...</span>
+        </div>
       )}
 
       {/* Bouton submit */}
@@ -197,10 +280,14 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {state.status === 'linking' ? 'Liaison en cours...' : 'Création en cours...'}
+            </span>
           </>
         ) : (
-          <span>Créer un compte</span>
+          <span>
+            {hasPendingStripeSession ? 'Créer un compte et lier mon abonnement' : 'Créer un compte'}
+          </span>
         )}
       </button>
     </form>

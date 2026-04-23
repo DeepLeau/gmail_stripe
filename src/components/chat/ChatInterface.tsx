@@ -6,11 +6,40 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { LimitBanner } from './LimitBanner'
+import { createClient } from '@/lib/supabase/client'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  userId: string
+  plan: string
+  messagesLimit: number
+  messagesUsed: number
+  subscriptionStatus: string
+}
+
+function hasActiveSubscription(status: string): boolean {
+  return ['active', 'trialing'].includes(status)
+}
+
+function isLimitReached(plan: string, messagesLimit: number, messagesUsed: number, status: string): boolean {
+  if (!hasActiveSubscription(status)) return false
+  if (plan === 'free') return false
+  return messagesLimit > 0 && messagesUsed >= messagesLimit
+}
+
+export function ChatInterface({
+  userId,
+  plan,
+  messagesLimit,
+  messagesUsed,
+  subscriptionStatus,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(
+    isLimitReached(plan, messagesLimit, messagesUsed, subscriptionStatus)
+  )
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -27,6 +56,26 @@ export function ChatInterface() {
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Check quota before sending (only for paid plans)
+    if (hasActiveSubscription(subscriptionStatus) && plan !== 'free') {
+      const supabase = createClient()
+      if (!supabase) {
+        setLimitReached(true)
+        return
+      }
+      const { data } = await supabase.rpc('decrement_message_count', {
+        p_user_id: userId,
+      })
+
+      const success = data && (data as { success: boolean }).success !== false
+      const remaining = data ? (data as { remaining: number }).remaining : 0
+
+      if (!success || remaining < 0) {
+        setLimitReached(true)
+        return
+      }
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -97,11 +146,13 @@ export function ChatInterface() {
 
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
+        {limitReached && <LimitBanner />}
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
-          onSubmit={() => handleSubmit()}
+          onSubmit={handleSubmit}
           isLoading={isLoading}
+          disabled={limitReached}
         />
       </div>
     </div>
