@@ -12,6 +12,25 @@ export default async function ChatPage() {
 
   const userEmail = user?.email ?? ''
 
+  // Fetch subscription data for UserMenu badge
+  let plan = 'Free'
+  let remaining = 0
+  let messagesLimit = 100
+
+  if (user) {
+    const { data: subscription } = await supabase
+      .from('user_subscriptions')
+      .select('plan, messages_limit, messages_used')
+      .maybeSingle()
+
+    if (subscription) {
+      plan = subscription.plan ?? 'Free'
+      messagesLimit = subscription.messages_limit ?? 100
+      const messagesUsed = subscription.messages_used ?? 0
+      remaining = Math.max(0, messagesLimit - messagesUsed)
+    }
+  }
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -19,7 +38,14 @@ export default async function ChatPage() {
         <span className="text-sm font-semibold text-gray-900 tracking-tight">
           Emind
         </span>
-        {userEmail && <UserMenu userEmail={userEmail} />}
+        {userEmail && (
+          <UserMenu
+            userEmail={userEmail}
+            plan={plan}
+            remaining={remaining}
+            messagesLimit={messagesLimit}
+          />
+        )}
       </header>
 
       {/* Zone de chat */}

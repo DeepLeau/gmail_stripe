@@ -6,9 +6,12 @@ import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
+  plan?: string
+  remaining?: number
+  messagesLimit?: number
 }
 
-export function UserMenu({ userEmail }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, remaining, messagesLimit }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -73,6 +76,33 @@ export function UserMenu({ userEmail }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
+
+          {/* Section Abonnement */}
+          {plan !== undefined && remaining !== undefined && messagesLimit !== undefined && (
+            <div className="px-3 py-2.5 border-b border-[var(--border)]">
+              <p className="text-xs text-[var(--text-3)] mb-1.5">Abonnement</p>
+              <div className="flex items-center justify-between">
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold uppercase tracking-wide"
+                  style={{
+                    backgroundColor: 'var(--accent-light)',
+                    color: 'var(--accent)',
+                  }}
+                >
+                  {plan}
+                </span>
+                <span className="text-xs text-[var(--text-2)]">
+                  {remaining} / {messagesLimit} msg
+                </span>
+              </div>
+              <a
+                href="/pricing"
+                className="mt-2 block text-xs text-[var(--accent)] hover:underline"
+              >
+                Gérer l&apos;abonnement
+              </a>
+            </div>
+          )}
 
           {/* Bouton déconnexion */}
           <button
