@@ -4,10 +4,13 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const PROTECTED_PREFIXES = ['/chat']
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
+  const PROTECTED_PREFIXES = ['/chat', '/signup']
+  const PUBLIC_PATHS = ['/login', '/']
 
-  if (!isProtected) {
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
+  const isPublic = PUBLIC_PATHS.includes(pathname)
+
+  if (isPublic || !isProtected) {
     return NextResponse.next({ request })
   }
 

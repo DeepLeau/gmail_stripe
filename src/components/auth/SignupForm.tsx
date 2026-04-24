@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscriptions'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -15,15 +16,20 @@ type SignupFormState = {
   }
 }
 
+interface SignupFormProps {
+  sessionId?: string
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [stripeLinked, setStripeLinked] = useState(false)
 
   const isLoading = state.status === 'loading'
 
@@ -90,11 +96,29 @@ export function SignupForm() {
       return
     }
 
+    // Link Stripe session if provided
+    if (sessionId) {
+      try {
+        await linkStripeSessionToUser(sessionId)
+        setStripeLinked(true)
+      } catch {
+        // Stripe linking failed but signup succeeded — continue to chat
+      }
+    }
+
     router.push('/chat')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Stripe success message */}
+      {stripeLinked && (
+        <div className="flex items-center gap-2 py-2.5 px-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-700">
+          <CheckCircle size={16} className="shrink-0" />
+          Abonnement activé avec succès
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
