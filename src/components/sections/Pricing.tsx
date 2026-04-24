@@ -1,7 +1,8 @@
 'use client'
 
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 
 const plans = [
   {
@@ -50,6 +51,102 @@ const containerVariants: Variants = {
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 24 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
+}
+
+interface PlanButtonProps {
+  plan: string
+  cta: string
+  highlighted: boolean
+}
+
+function PlanButton({ plan, cta, highlighted }: PlanButtonProps) {
+  const [status, setStatus] = useState<'idle' | 'loading' | 'error'>('idle')
+
+  async function handleClick() {
+    if (status === 'loading') return
+
+    setStatus('loading')
+
+    try {
+      const response = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create checkout session')
+      }
+
+      const { url } = await response.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch {
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 3000)
+    }
+  }
+
+  const isLoading = status === 'loading'
+  const isError = status === 'error'
+
+  return (
+    <button
+      onClick={handleClick}
+      disabled={isLoading}
+      className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+      style={
+        highlighted
+          ? {
+              backgroundColor: isError ? 'var(--red)' : isLoading ? 'var(--accent)/70' : 'var(--accent)',
+              color: '#fff',
+              boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+            }
+          : {
+              backgroundColor: 'transparent',
+              color: isError ? 'var(--red)' : 'var(--text-2)',
+              border: '1px solid var(--border-md)',
+            }
+      }
+      onMouseEnter={(e) => {
+        if (highlighted && !isLoading && !isError) {
+          ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            'var(--accent-hi)'
+          ;(e.currentTarget as HTMLButtonElement).style.transform =
+            'translateY(-1px)'
+        } else if (!highlighted && !isLoading) {
+          ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+            'var(--accent)'
+          ;(e.currentTarget as HTMLButtonElement).style.color =
+            'var(--accent)'
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (highlighted && !isLoading && !isError) {
+          ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+            'var(--accent)'
+          ;(e.currentTarget as HTMLButtonElement).style.transform = ''
+        } else if (!highlighted) {
+          ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+            'var(--border-md)'
+          ;(e.currentTarget as HTMLButtonElement).style.color =
+            'var(--text-2)'
+        }
+      }}
+    >
+      {isLoading ? (
+        <>
+          <Loader2 size={15} className="animate-spin shrink-0" />
+          <span>Redirection...</span>
+        </>
+      ) : isError ? (
+        <span>Réessayer</span>
+      ) : (
+        <span>{cta}</span>
+      )}
+    </button>
+  )
 }
 
 export function Pricing() {
@@ -228,49 +325,11 @@ export function Pricing() {
               </ul>
 
               {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
-                style={
-                  plan.highlighted
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
-                      }
-                }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
-              >
-                {plan.cta}
-              </button>
+              <PlanButton
+                plan={plan.name}
+                cta={plan.cta}
+                highlighted={plan.highlighted}
+              />
             </motion.div>
           ))}
         </motion.div>

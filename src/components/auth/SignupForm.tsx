@@ -1,12 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -20,12 +20,16 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const isLoading = state.status === 'loading'
+  const isLinking = state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -77,7 +81,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data: signUpData, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -88,6 +92,23 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    const newUserId = signUpData?.user?.id
+
+    // If Stripe session_id present, link it to the new user
+    if (sessionId && newUserId) {
+      setState({ status: 'linking' })
+
+      const { error: linkError } = await supabase.rpc('link_stripe_session_to_user', {
+        p_session_id: sessionId,
+        p_user_id: newUserId,
+      })
+
+      if (linkError) {
+        setState({ status: 'error', errorMessage: 'Erreur lors de la liaison du paiement. Tu peux néanmoins accéder à ton compte.' })
+        return
+      }
     }
 
     router.push('/chat')
@@ -106,7 +127,7 @@ export function SignupForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="vous@exemple.com"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -132,7 +153,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="Minimum 6 caractères"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -158,7 +179,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="••••••••"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -188,7 +209,7 @@ export function SignupForm() {
       {/* Bouton submit */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || isLinking}
         className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
                    bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
                    text-sm font-medium transition-colors duration-150
@@ -198,6 +219,11 @@ export function SignupForm() {
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : isLinking ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Finalisation du paiement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
