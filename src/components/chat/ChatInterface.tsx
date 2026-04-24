@@ -6,14 +6,29 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { SubscriptionBadge } from './SubscriptionBadge'
+import { LimitReachedBanner } from './LimitReachedBanner'
+import type { StripePlanName } from '@/lib/stripe/config'
 
-export function ChatInterface() {
+interface SubscriptionInfo {
+  plan: StripePlanName
+  remaining: number
+  limit: number
+  limitReached: boolean
+}
+
+interface ChatInterfaceProps {
+  subscription?: SubscriptionInfo | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll automatique vers le bas après chaque message
+  const limitReached = subscription?.limitReached ?? false
+
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -26,9 +41,8 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached) return
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,7 +52,6 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -50,7 +63,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // silently handle
     } finally {
       setIsLoading(false)
     }
@@ -58,7 +71,25 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
-      {/* Zone des messages */}
+      {subscription && (
+        <div className="shrink-0 mb-4">
+          <SubscriptionBadge
+            plan={subscription.plan}
+            remaining={subscription.remaining}
+            limit={subscription.limit}
+          />
+        </div>
+      )}
+
+      {limitReached && subscription && (
+        <div className="shrink-0 mb-4">
+          <LimitReachedBanner
+            currentPlan={subscription.plan}
+            limit={subscription.limit}
+          />
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -95,13 +126,13 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          limitReached={limitReached}
         />
       </div>
     </div>

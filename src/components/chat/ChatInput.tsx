@@ -8,9 +8,10 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  limitReached?: boolean
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, limitReached = false }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -39,7 +40,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading) {
+      if (value.trim() && !isLoading && !limitReached) {
         onSubmit()
         // Reset textarea après envoi
         if (textareaRef.current) {
@@ -50,7 +51,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
     }
   }
 
-  const isDisabled = isLoading || !value.trim()
+  const isDisabled = isLoading || !value.trim() || limitReached
 
   return (
     <form
@@ -64,27 +65,34 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
       }}
       className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
     >
-      <textarea
-        ref={textareaRef}
-        value={value}
-        onChange={handleChange}
-        onKeyDown={handleKeyDown}
-        placeholder="Pose une question..."
-        rows={1}
-        disabled={isLoading}
-        className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
-        style={{
-          height: 'auto',
-          overflowY: 'hidden',
-          lineHeight: '24px',
-        }}
-      />
+      <div className="flex-1 relative">
+        <textarea
+          ref={textareaRef}
+          value={value}
+          onChange={handleChange}
+          onKeyDown={handleKeyDown}
+          placeholder={limitReached ? "Limite atteinte — passez à Pro" : "Pose une question..."}
+          rows={1}
+          disabled={isLoading || limitReached}
+          className="w-full bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
+          style={{
+            height: 'auto',
+            overflowY: 'hidden',
+            lineHeight: '24px',
+          }}
+        />
+      </div>
 
       <button
         type="submit"
         disabled={isDisabled}
-        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
+        className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 ${
+          limitReached
+            ? 'bg-gray-300 cursor-not-allowed'
+            : 'bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed'
+        }`}
         aria-label="Envoyer"
+        title={limitReached ? 'Limite de messages atteinte' : 'Envoyer'}
       >
         <Send size={15} className="text-white" strokeWidth={2} />
       </button>
