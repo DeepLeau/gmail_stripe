@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscriptions'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -20,12 +21,17 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [linking, setLinking] = useState(false)
+  const [linkError, setLinkError] = useState<string | null>(null)
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || linking
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -40,12 +46,6 @@ export function SignupForm() {
       fieldErrors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
       fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
     }
 
     if (!confirmPassword) {
@@ -70,6 +70,7 @@ export function SignupForm() {
     if (!validate()) return
 
     setState({ status: 'loading' })
+    setLinkError(null)
 
     const supabase = createClient()
     if (!supabase) {
@@ -87,6 +88,53 @@ export function SignupForm() {
         ? 'Un compte existe déjà avec cet email'
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
+      return
+    }
+
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+
+    if (sessionId && user) {
+      setLinking(true)
+      const linkResult = await linkStripeSessionToUser(sessionId, user.id)
+
+      if (!linkResult.success) {
+        setLinkError(linkResult.error || 'Erreur lors de la liaison du paiement')
+        setLinking(false)
+        return
+      }
+    }
+
+    router.push('/chat')
+  }
+
+  async function handleRetryLink() {
+    if (!sessionId) return
+
+    setState({ status: 'loading' })
+    setLinkError(null)
+
+    const supabase = createClient()
+    if (!supabase) {
+      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+      return
+    }
+
+    const { data: userData } = await supabase.auth.getUser()
+    const user = userData?.user
+
+    if (!user) {
+      setState({ status: 'error', errorMessage: 'Session expirée, veuillez vous reconnecter' })
+      return
+    }
+
+    setLinking(true)
+    const linkResult = await linkStripeSessionToUser(sessionId, user.id)
+
+    if (!linkResult.success) {
+      setLinkError(linkResult.error || 'Erreur lors de la liaison du paiement')
+      setLinking(false)
+      setState({ status: 'idle' })
       return
     }
 
@@ -185,6 +233,33 @@ export function SignupForm() {
         </p>
       )}
 
+      {/* Erreur de linking Stripe */}
+      {linkError && (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+            {linkError}
+          </p>
+          <button
+            type="button"
+            onClick={handleRetryLink}
+            disabled={linking}
+            className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
+                       bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
+                       text-sm font-medium transition-colors duration-150
+                       disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            {linking ? (
+              <>
+                <Loader2 size={15} className="animate-spin shrink-0" />
+                <span>Réessai en cours...</span>
+              </>
+            ) : (
+              <span>Réessayer la liaison</span>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Bouton submit */}
       <button
         type="submit"
@@ -197,7 +272,7 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>{linking ? 'Liaison du paiement...' : 'Création en cours...'}</span>
           </>
         ) : (
           <span>Créer un compte</span>
