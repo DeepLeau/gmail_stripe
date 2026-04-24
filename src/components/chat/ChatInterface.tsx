@@ -7,7 +7,12 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining: number | null
+  planName: string | null
+}
+
+export function ChatInterface({ remaining, planName }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -58,6 +63,28 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Badge plan + quota */}
+      {planName && (
+        <div className="shrink-0 mb-4 flex items-center justify-center">
+          <div
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: 'var(--accent-light)',
+              color: 'var(--accent)',
+              border: '1px solid rgba(59, 130, 246, 0.15)',
+            }}
+          >
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: 'var(--accent)' }} />
+            {planName}
+            {remaining !== null && (
+              <span style={{ color: 'var(--text-2)' }}>
+                · {remaining} messages restants
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +129,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>
