@@ -14,7 +14,6 @@ export default async function ChatPage() {
 
   return (
     <main className="flex flex-col h-screen bg-white">
-      {/* Header discret */}
       <header className="shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-900 tracking-tight">
           Emind
@@ -22,7 +21,6 @@ export default async function ChatPage() {
         {userEmail && <UserMenu userEmail={userEmail} />}
       </header>
 
-      {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
           <ChatInterface />

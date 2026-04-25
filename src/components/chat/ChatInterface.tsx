@@ -6,14 +6,31 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { UpgradePrompt } from '@/components/billing/UpgradePrompt'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  messagesLimit?: number
+  currentPlan?: string
+  nextPlan?: string
+  initialMessagesUsed?: number
+}
+
+export function ChatInterface({
+  messagesLimit = 10,
+  currentPlan = 'free',
+  nextPlan = 'start',
+  initialMessagesUsed = 0,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [messagesUsed, setMessagesUsed] = useState(initialMessagesUsed)
+  const [messagesLimitState] = useState(messagesLimit)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll automatique vers le bas après chaque message
+  const isAtLimit = messagesUsed >= messagesLimitState
+  const usagePercentage = Math.min((messagesUsed / messagesLimitState) * 100, 100)
+
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -22,13 +39,31 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const trackUsage = async () => {
+    try {
+      const response = await fetch('/api/usage', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ count: 1 }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setMessagesUsed(data.used ?? messagesUsed + 1)
+      }
+    } catch {
+      setMessagesUsed((prev) => prev + 1)
+    }
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
+
+    if (isAtLimit) return
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,7 +73,6 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -49,16 +83,29 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+      await trackUsage()
     } catch {
-      // Erreur silencieuse — could add error state here
+      // silent
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleUpgrade = () => {
+    fetch('/api/stripe/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId: nextPlan }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.url) window.location.href = data.url
+      })
+      .catch(console.error)
+  }
+
   return (
     <div className="flex flex-col h-full py-6">
-      {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -95,7 +142,16 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
+      {isAtLimit && (
+        <div className="shrink-0 pb-4">
+          <UpgradePrompt
+            currentPlan={currentPlan}
+            usagePercentage={usagePercentage}
+            onUpgrade={handleUpgrade}
+          />
+        </div>
+      )}
+
       <div className="shrink-0 pt-4">
         <ChatInput
           value={inputValue}
