@@ -4,7 +4,31 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  const PROTECTED_PREFIXES = ['/chat']
+  // Routes that don't require authentication
+  const PUBLIC_PREFIXES = [
+    '/api/stripe/checkout',
+    '/api/stripe/webhook',
+    '/login',
+    '/signup',
+    '/api/auth',
+  ]
+
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+
+  if (isPublic) {
+    return NextResponse.next({ request })
+  }
+
+  // Routes that require authentication
+  const PROTECTED_PREFIXES = [
+    '/chat',
+    '/api/stripe/portal',
+    '/api/subscriptions',
+    '/api/usage',
+    '/api/auth/link-pending-session',
+    '/settings/billing',
+  ]
+
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
 
   if (!isProtected) {
