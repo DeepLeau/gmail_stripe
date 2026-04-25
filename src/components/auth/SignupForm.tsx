@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkSubscription } from '@/app/actions/subscription'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,7 +19,11 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string | null
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -88,6 +93,16 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Link subscription if session_id was provided
+    if (sessionId) {
+      try {
+        await linkSubscription(sessionId)
+      } catch {
+        // Subscription linking failed but account was created
+        // The subscription can be recovered via Stripe webhook or manual process
+      }
     }
 
     router.push('/chat')
