@@ -12,6 +12,9 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Secure data handling** — Encrypted storage, no data resale, revocable access
 - **AI Chat Interface** — Clean, modern chat experience at `/chat` with typing indicators and auto-scroll
 - **User Authentication** — Sign up and log in to access your personal chat
+- **Simple Pricing Plans** — Start (10 messages/month), Scale (50 messages/month), Team (100 messages/month)
+- **Usage Tracking** — See your current plan and remaining messages in the chat interface
+- **Smart Upgrade Prompts** — Get a gentle nudge to upgrade when you hit your message limit
 
 ## 🛠️ Tech Stack
 
@@ -22,6 +25,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Icons**: Lucide React
 - **UI Utilities**: clsx, tailwind-merge, class-variance-authority
 - **Auth**: Supabase Authentication
+- **Payments**: Stripe Checkout
 
 ## 🚀 Quick Start
 
@@ -65,16 +69,20 @@ Add the following content to `.env.local`:
 # Find these in: Supabase Dashboard > Project Settings > API
 NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+
+# Stripe — Payment Configuration
+# Find these in: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_test_your_secret_key
+NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key
+
+# Stripe — Webhook Secret (set up in Stripe Dashboard > Webhooks)
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+
+# Stripe — Price IDs (create products in Stripe Dashboard > Products)
+STRIPE_START_PRICE_ID=price_start_plan_id
+STRIPE_SCALE_PRICE_ID=price_scale_plan_id
+STRIPE_TEAM_PRICE_ID=price_team_plan_id
 ```
-
-**How to find your Supabase credentials:**
-
-1. Go to [Supabase](https://supabase.com/) and log in
-2. Select your project
-3. Click **Project Settings** (the gear icon) in the left sidebar
-4. Click **API**
-5. Copy the **Project URL** and paste it as `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy the **anon/public key** and paste it as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
 ### 4. Run the development server
 
@@ -91,86 +99,135 @@ After a few seconds, you'll see:
 
 Open [http://localhost:3000](http://localhost:3000) in your browser to see the landing page.
 
-### 5. Create an account
+### 5. Create your Stripe Products
 
-Visit [http://localhost:3000/signup](http://localhost:3000/signup) to create your account. After signing up, you'll be automatically redirected to the chat page.
+Before using the pricing page, you need to create 3 products in Stripe:
+
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/) and log in
+2. Click **Products** in the left sidebar
+3. Click **Add product** for each plan:
+
+| Plan | Name | Price | Interval | Features |
+|------|------|-------|----------|----------|
+| Start | Start Plan | $9.00 | Monthly | 10 messages/month |
+| Scale | Scale Plan | $29.00 | Monthly | 50 messages/month |
+| Team | Team Plan | $79.00 | Monthly | 100 messages/month |
+
+4. For each product, copy the **Price ID** (starts with `price_`) and add it to your `.env.local`
 
 ## 🔑 Environment Variables
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard → Project Settings → API → Project URL | Your Supabase project connection URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard → Project Settings → API → Project API Keys → anon/public | Public API key for Supabase client authentication |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase > Project Settings > API > Project URL | Supabase project connection URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase > Project Settings > API > anon/public key | Public API key for Supabase |
+| `STRIPE_SECRET_KEY` | Yes | Stripe > Developers > API keys > Secret key | Secret key for Stripe server-side operations |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe > Developers > API keys > Publishable key | Public key for Stripe client-side |
+| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe > Developers > Webhooks > your endpoint | Validates incoming webhook events |
+| `STRIPE_START_PRICE_ID` | Yes | Stripe > Products > your product > Price ID | Price ID for Start plan |
+| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe > Products > your product > Price ID | Price ID for Scale plan |
+| `STRIPE_TEAM_PRICE_ID` | Yes | Stripe > Products > your product > Price ID | Price ID for Team plan |
+
+**Supabase Setup:**
+1. Go to [Supabase](https://supabase.com/) and create a project
+2. Navigate to **Project Settings** (gear icon) > **API**
+3. Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+4. Copy **anon/public key** → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+**Stripe Setup:**
+1. Create a [Stripe account](https://stripe.com/)
+2. Go to **Developers** > **API keys**
+3. Copy the **Secret key** → `STRIPE_SECRET_KEY`
+4. Copy the **Publishable key** → `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+5. Go to **Developers** > **Webhooks** > **Add endpoint**
+6. Enter `https://your-domain.com/api/webhooks/stripe` and select events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
+7. Copy the **Webhook secret** → `STRIPE_WEBHOOK_SECRET`
+
+## 💳 How the Payment Flow Works
+
+1. **User selects a plan** on the landing page pricing section
+2. **User clicks "Subscribe"** — they are redirected to Stripe Checkout
+3. **User pays on Stripe** — no account creation required at this step
+4. **Stripe redirects back** to your app with a session ID
+5. **User creates their account** — during signup, the system links the paid subscription to their new account
+6. **User can chat** — they see their plan and remaining messages in the chat interface
+
+When the user reaches their message limit, they'll see a friendly prompt suggesting they upgrade to a higher plan.
+
+Message counts reset automatically each month when the subscription renews.
+
+## 🧪 Running Tests
+
+Unit tests check that the UI components work correctly — they verify that buttons, badges, and prompts display the right information for different user states.
+
+```bash
+# Run all tests
+npx jest
+
+# Run a specific test file
+npx jest __tests__/PlanBadge.test.tsx
+npx jest __tests__/SignupPrompt.test.tsx
+
+# Watch mode (re-runs tests automatically when files change)
+npx jest --watch
+```
+
+**Reading the output:**
+- `PASS` — All tests passed, everything works correctly
+- `FAIL` — Something is broken, the output shows which test failed and why
+
+The test suite covers:
+- `PlanBadge.test.tsx` — Pricing plan display component
+- `SignupPrompt.test.tsx` — Signup call-to-action component
 
 ## 📁 Project Structure
 
 ```
-my-app/
 ├── src/
-│   ├── app/                    # Next.js App Router — pages and layout
-│   │   ├── globals.css         # Global styles and Tailwind imports
-│   │   ├── layout.tsx          # Root layout (fonts, metadata)
-│   │   ├── page.tsx            # Home page — landing page
-│   │   ├── login/
-│   │   │   └── page.tsx        # Login page at /login
-│   │   ├── signup/
-│   │   │   └── page.tsx        # Signup page at /signup
-│   │   ├── chat/
-│   │   │   └── page.tsx        # AI Chat page at /chat (protected)
-│   │   └── actions/
-│   │       └── auth.ts         # Server-side authentication actions
-│   ├── components/
-│   │   ├── ui/                 # Reusable UI components
-│   │   │   ├── Navbar.tsx      # Top navigation bar
-│   │   │   ├── Footer.tsx      # Page footer
-│   │   │   └── UserMenu.tsx    # User dropdown menu with logout
-│   │   ├── auth/               # Authentication components
-│   │   │   ├── AuthCard.tsx    # Shared auth card wrapper
-│   │   │   ├── LoginForm.tsx   # Login form component
-│   │   │   └── SignupForm.tsx  # Signup form component
-│   │   └── sections/           # Landing page sections
-│   ├── lib/
-│   │   └── supabase/
-│   │       ├── client.ts       # Supabase client for browser
-│   │       └── server.ts       # Supabase client for server
-│   └── middleware.ts           # Next.js middleware for route protection
-├── public/                     # Static assets
-├── tailwind.config.ts          # Tailwind CSS configuration
-├── next.config.mjs             # Next.js configuration
-└── package.json                # Dependencies and scripts
+│   ├── app/              # Next.js App Router pages and layouts
+│   ├── components/       # Reusable UI components
+│   ├── lib/              # Utility functions and helpers
+│   └── styles/           # Global styles
+├── __tests__/            # Jest unit tests
+├── public/               # Static assets
+├── .env.local            # Environment variables (create this)
+└── package.json          # Dependencies and scripts
 ```
-
-### Key Files for Authentication
-
-| File | Purpose |
-|------|---------|
-| `src/app/login/page.tsx` | Login page with email/password form |
-| `src/app/signup/page.tsx` | Signup page with email/password form |
-| `src/components/auth/LoginForm.tsx` | Login form component |
-| `src/components/auth/SignupForm.tsx` | Signup form component |
-| `src/middleware.ts` | Protects `/chat` route — redirects unauthenticated users to `/login` |
-| `src/lib/supabase/client.ts` | Browser-side Supabase client |
-| `src/lib/supabase/server.ts` | Server-side Supabase client |
-| `src/app/actions/auth.ts` | Server actions for sign up, sign in, sign out |
-| `src/components/ui/UserMenu.tsx` | User dropdown with logout button |
 
 ## 🚀 Deploy to Vercel
 
-The easiest way to deploy your Emind app:
-
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-### Step by step:
+### Step-by-step deployment:
 
-1. **Import your repository** — Click "Import Git Repository" and select your GitHub repo
-2. **Configure environment variables** — In Vercel dashboard, go to **Settings → Environment Variables** and add:
-   - `NEXT_PUBLIC_SUPABASE_URL` = your Supabase project URL
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` = your Supabase anon key
-3. **Deploy** — Click "Deploy" and wait for the build to complete
-4. **Test** — Visit your deployed URL and verify the login/signup flow works
+1. **Push your code to GitHub** (if you haven't already)
+   ```bash
+   git init
+   git add .
+   git commit -m "Initial commit"
+   git branch -M main
+   git remote add origin https://github.com/YOUR_USERNAME/my-app.git
+   git push -u origin main
+   ```
 
-> ⚠️ **Important**: Make sure to add both `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` environment variables in Vercel, otherwise authentication won't work on the deployed site.
+2. **Go to [Vercel](https://vercel.com/)** and click "New Project"
+
+3. **Import your GitHub repository** — select `my-app` from the list
+
+4. **Add your environment variables** — click "Environment Variables" and add each variable from your `.env.local`:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `STRIPE_SECRET_KEY`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_START_PRICE_ID`
+   - `STRIPE_SCALE_PRICE_ID`
+   - `STRIPE_TEAM_PRICE_ID`
+
+5. **Click "Deploy"** — Vercel will build and deploy your app
+
+6. **Set up your Stripe webhook** — update your Stripe webhook endpoint to use your new Vercel URL (e.g., `https://your-app.vercel.app/api/webhooks/stripe`)
 
 ## 📝 License
 
-MIT
+MIT License — feel free to use, modify, and distribute this project.

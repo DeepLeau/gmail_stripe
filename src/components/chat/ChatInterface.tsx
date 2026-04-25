@@ -6,12 +6,60 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { PlanBadge } from './PlanBadge'
+import { UpgradePrompt } from './UpgradePrompt'
+
+interface SubscriptionInfo {
+  planName: string
+  messagesUsed: number
+  messagesLimit: number
+}
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
+  const [isLimited, setIsLimited] = useState(false)
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription info on mount
+  useEffect(() => {
+    async function fetchSubscription() {
+      try {
+        const response = await fetch('/api/user/subscription')
+        if (response.ok) {
+          const data = await response.json()
+          setSubscription({
+            planName: data.plan_name || 'Free',
+            messagesUsed: data.messages_used || 0,
+            messagesLimit: data.messages_limit || 100,
+          })
+          setIsLimited(data.is_limited || false)
+        } else {
+          // Default to Free plan
+          setSubscription({
+            planName: 'Free',
+            messagesUsed: 0,
+            messagesLimit: 100,
+          })
+          setIsLimited(false)
+        }
+      } catch {
+        setSubscription({
+          planName: 'Free',
+          messagesUsed: 0,
+          messagesLimit: 100,
+        })
+        setIsLimited(false)
+      } finally {
+        setIsLoadingSubscription(false)
+      }
+    }
+
+    fetchSubscription()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +70,41 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  // Increment message count
+  const incrementMessageCount = async () => {
+    try {
+      const response = await fetch('/api/messages/count', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'increment' }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setSubscription((prev) =>
+          prev
+            ? {
+                ...prev,
+                messagesUsed: data.messages_used,
+                messagesLimit: data.messages_limit,
+              }
+            : null
+        )
+        setIsLimited(data.is_limited || false)
+      }
+    } catch {
+      // Silent fail
+    }
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimited) return
+
+    // Increment message count before sending
+    await incrementMessageCount()
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -58,8 +136,18 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Plan badge */}
+      <div className="shrink-0 mb-4 px-6">
+        <PlanBadge
+          planName={subscription?.planName || 'Free'}
+          used={subscription?.messagesUsed || 0}
+          limit={subscription?.messagesLimit || 100}
+          isLoading={isLoadingSubscription}
+        />
+      </div>
+
       {/* Zone des messages */}
-      <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
+      <div className="flex-1 overflow-y-auto space-y-4 min-h-0 px-6">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
@@ -95,13 +183,17 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Upgrade prompt */}
+      {isLimited && <UpgradePrompt />}
+
       {/* Input fixe en bas */}
-      <div className="shrink-0 pt-4">
+      <div className="shrink-0 pt-4 px-6">
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={isLimited}
         />
       </div>
     </div>
