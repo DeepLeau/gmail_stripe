@@ -1,7 +1,8 @@
 export const dynamic = 'force-dynamic'
 
+import { Suspense } from 'react'
 import { AuthCard } from '@/components/auth/AuthCard'
-import { SignupForm } from '@/components/auth/SignupForm'
+import { SignupFormWithLinking } from '@/components/auth/SignupFormWithLinking'
 
 export default function SignupPage() {
   return (
@@ -10,7 +11,9 @@ export default function SignupPage() {
       altLinkLabel="Déjà un compte ? Se connecter"
       altLinkHref="/login"
     >
-      <SignupForm />
+      <Suspense fallback={null}>
+        <SignupFormWithLinking />
+      </Suspense>
     </AuthCard>
   )
 }

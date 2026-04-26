@@ -6,12 +6,39 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { PlanStatusBar } from './PlanStatusBar'
+import { LimitReachedBanner } from './LimitReachedBanner'
+import type { SubscriptionData } from '@/lib/stripe/config'
+
+interface UsageState {
+  plan: string | null
+  messagesLimit: number
+  messagesUsed: number
+  periodEnd: string | null
+}
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [usage, setUsage] = useState<UsageState | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch usage on mount
+  useEffect(() => {
+    async function fetchUsage() {
+      try {
+        const res = await fetch('/api/usage', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setUsage(data)
+        }
+      } catch {
+        // Non-blocking — chat still works without usage data
+      }
+    }
+    fetchUsage()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +49,31 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const isLimitReached =
+    usage !== null && usage.messagesLimit > 0 && usage.messagesUsed >= usage.messagesLimit
+
+  // Build SubscriptionData for PlanStatusBar
+  const subscriptionData: SubscriptionData | null = usage
+    ? {
+        plan: usage.plan,
+        units_used: usage.messagesUsed,
+        units_limit: usage.messagesLimit > 0 ? usage.messagesLimit : null,
+        units_remaining:
+          usage.messagesLimit > 0
+            ? Math.max(0, usage.messagesLimit - usage.messagesUsed)
+            : null,
+        status: usage.plan ? 'active' : 'free',
+      }
+    : null
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Client-side gating
+    if (isLimitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -41,7 +88,10 @@ export function ChatInterface() {
     // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendMessage(trimmed, {
+        messagesUsed: usage?.messagesUsed ?? 0,
+        messagesLimit: usage?.messagesLimit ?? 0,
+      })
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
@@ -49,6 +99,12 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+      // Optimistically increment local usage count
+      if (usage) {
+        setUsage((prev) =>
+          prev ? { ...prev, messagesUsed: prev.messagesUsed + 1 } : prev
+        )
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -58,6 +114,13 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Plan status bar */}
+      {subscriptionData && (
+        <div className="shrink-0 mb-4">
+          <PlanStatusBar subscription={subscriptionData} />
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -95,13 +158,14 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
-      <div className="shrink-0 pt-4">
+      {/* Limit reached banner + input */}
+      <div className="shrink-0 pt-4 flex flex-col gap-2">
+        {isLimitReached && <LimitReachedBanner />}
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
-          isLoading={isLoading}
+          isLoading={isLoading || isLimitReached}
         />
       </div>
     </div>
