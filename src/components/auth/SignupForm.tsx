@@ -6,26 +6,31 @@ import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
     password?: string
     confirmPassword?: string
   }
+  linkageWarning?: boolean
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string | null
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -90,11 +95,53 @@ export function SignupForm() {
       return
     }
 
+    // Link pending Stripe session if present
+    if (sessionId) {
+      setState({ status: 'linking' })
+      try {
+        const res = await fetch('/api/subscription/pending', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ stripeSessionId: sessionId }),
+        })
+        if (!res.ok) {
+          // Non-blocking: warn but continue
+          setState((prev) => ({ ...prev, status: 'idle', linkageWarning: true }))
+          router.push('/chat')
+          return
+        }
+      } catch {
+        setState((prev) => ({ ...prev, status: 'idle', linkageWarning: true }))
+        router.push('/chat')
+        return
+      }
+    }
+
     router.push('/chat')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Pending subscription badge */}
+      {sessionId && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+          style={{
+            backgroundColor: 'var(--accent-light)',
+            color: 'var(--accent)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+          }}>
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent)' }} />
+          Un abonnement est en attente de linkage
+        </div>
+      )}
+
+      {/* Linkage warning */}
+      {state.linkageWarning && (
+        <p className="text-xs text-[var(--amber)] text-center py-2 px-3 rounded-lg bg-amber-50 border border-amber-200">
+          Votre abonnement sera activé automatiquement sous peu.
+        </p>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -197,7 +244,7 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>{state.status === 'linking' ? 'Activation...' : 'Création en cours...'}</span>
           </>
         ) : (
           <span>Créer un compte</span>
