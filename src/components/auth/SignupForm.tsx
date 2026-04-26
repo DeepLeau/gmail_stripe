@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
+
+type SignupFormProps = {
+  sessionId?: string
+  onSignupSuccess?: () => Promise<void>
+}
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,7 +24,7 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ sessionId, onSignupSuccess }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -90,7 +96,16 @@ export function SignupForm() {
       return
     }
 
-    router.push('/chat')
+    // Flow guest : si un sessionId est présent, lier Stripe au user
+    if (sessionId) {
+      await linkStripeSessionToUser(sessionId)
+    }
+
+    if (onSignupSuccess) {
+      await onSignupSuccess()
+    } else {
+      router.push('/chat')
+    }
   }
 
   return (
