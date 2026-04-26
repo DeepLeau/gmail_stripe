@@ -8,9 +8,10 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, disabled = false }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -39,7 +40,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading) {
+      if (value.trim() && !isLoading && !disabled) {
         onSubmit()
         // Reset textarea après envoi
         if (textareaRef.current) {
@@ -50,7 +51,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
     }
   }
 
-  const isDisabled = isLoading || !value.trim()
+  const isDisabled = isLoading || disabled || !value.trim()
 
   return (
     <form
@@ -71,7 +72,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
         onKeyDown={handleKeyDown}
         placeholder="Pose une question..."
         rows={1}
-        disabled={isLoading}
+        disabled={isLoading || disabled}
         className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
         style={{
           height: 'auto',

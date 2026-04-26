@@ -5,9 +5,11 @@ type AuthCardProps = {
   altLinkLabel: string
   altLinkHref: string
   children: React.ReactNode
+  sessionId?: string
+  planName?: string
 }
 
-export function AuthCard({ title, altLinkLabel, altLinkHref, children }: AuthCardProps) {
+export function AuthCard({ title, altLinkLabel, altLinkHref, children, sessionId, planName }: AuthCardProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface)] relative overflow-hidden px-4">
       {/* Orb gradients — reprenant le hero de la landing */}

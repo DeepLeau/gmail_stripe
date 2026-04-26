@@ -1,0 +1,5 @@
+-- SUPPRIMÉE
+-- La logique de reset mensuel sera implémentée côté serveur via un endpoint
+-- /api/billing/reset-usage (service_role) plutôt qu'une fonction SQL SECURITY DEFINER.
+-- Le trigger on_usage_period_change (migration 004) ne se déclenche jamais
+-- car la policy UPDATE de user_usage bloque la modification de period_start côté client.

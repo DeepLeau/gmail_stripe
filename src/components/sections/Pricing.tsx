@@ -2,40 +2,60 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
+import { CheckoutButton } from '@/components/billing/CheckoutButton'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: 'Start',
+    price: '9 €',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour démarrer avec Emind et découvrir l\'IA sur tes emails.',
     features: [
-      { text: '100 questions / mois', included: true },
+      { text: '10 messages / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    planId: 'start',
+    cta: 'Commencer avec Start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    name: 'Scale',
+    price: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui utilisent Emind au quotidien.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '50 messages / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    planId: 'scale',
+    cta: 'Passer à Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    name: 'Team',
+    price: '79 €',
+    period: 'mois',
+    description: 'Pour les équipes qui veulent une IA email performante.',
+    features: [
+      { text: '100 messages / mois', included: true },
+      { text: 'Boîtes mail illimitées', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    planId: 'team',
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -102,7 +122,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Start, Scale ou Team quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,7 +132,7 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
           {plans.map((plan, i) => (
             <motion.div
@@ -134,7 +154,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for Scale */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -228,49 +248,7 @@ export function Pricing() {
               </ul>
 
               {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
-                style={
-                  plan.highlighted
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
-                      }
-                }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
-              >
-                {plan.cta}
-              </button>
+              <CheckoutButton planId={plan.planId} label={plan.cta} highlighted={plan.highlighted} />
             </motion.div>
           ))}
         </motion.div>

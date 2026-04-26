@@ -52,7 +52,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Comment fonctionne la tarification ?",
     answer:
-      "Nous proposons deux plans : un plan gratuit limité à 100 questions/mois et 1 boîte mail, et un plan Pro illimité avec plusieurs boîtes mail et une priorité de traitement. Aucune surprise — les prix sont transparents dès la page d'accueil.",
+      "Nous proposons trois plans : Start (9€/mois, 10 messages), Scale (29€/mois, 50 messages) et Team (79€/mois, 100 messages). Le plan gratuit offre 5 messages/mois pour découvrir Emind sans engagement.",
   },
   {
     question: "Mes données email sont-elles en sécurité ?",
@@ -62,7 +62,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Puis-je connecter plusieurs boîtes email ?",
     answer:
-      "Le plan gratuit autorise 1 boîte mail. Le plan Pro permet de connecter autant de boîtes que vous le souhaitez — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
+      "Le plan Start autorise 1 boîte mail. Le plan Scale permet de connecter plusieurs boîtes, et le plan Team offre des boîtes email illimitées — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
   },
   {
     question: "L'IA peut-elle répondre à mes clients à ma place ?",
@@ -160,9 +160,9 @@ export const plans: Plan[] = [
   {
     name: "Free",
     price: "0",
-    description: "Pour découvrir Emind et automiser vos réponses email.",
+    description: "Pour découvrir Emind et tester l'IA sur tes emails.",
     features: [
-      "100 questions/mois",
+      "5 messages/mois",
       "1 boîte email connectée",
       "Réponses en 10 secondes",
       "Support par email",
@@ -171,18 +171,46 @@ export const plans: Plan[] = [
     highlighted: false,
   },
   {
-    name: "Pro",
-    price: "29",
-    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
+    name: "Start",
+    price: "9",
+    description: "Pour démarrer avec Emind et découvrir l'IA sur tes emails.",
     features: [
-      "Questions illimitées",
-      "Boîtes email illimitées",
-      "Priorité de traitement",
-      "Réponses en 3 secondes",
-      "Support prioritaire",
+      "10 messages/mois",
+      "1 boîte email connectée",
+      "Résumés de threads",
+      "Recherche en langage naturel",
     ],
-    cta: "Passer Pro",
+    cta: "Commencer avec Start",
+    highlighted: false,
+  },
+  {
+    name: "Scale",
+    price: "29",
+    description: "Pour les professionnels qui utilisent Emind au quotidien.",
+    features: [
+      "50 messages/mois",
+      "Plusieurs boîtes email",
+      "Résumés de threads",
+      "Recherche en langage naturel",
+      "Multi-comptes",
+    ],
+    cta: "Passer à Scale",
     highlighted: true,
+  },
+  {
+    name: "Team",
+    price: "79",
+    description: "Pour les équipes qui veulent une IA email performante.",
+    features: [
+      "100 messages/mois",
+      "Boîtes email illimitées",
+      "Résumés de threads",
+      "Recherche en langage naturel",
+      "Multi-comptes",
+      "Priorité de traitement",
+    ],
+    cta: "Passer à Team",
+    highlighted: false,
   },
 ]
 

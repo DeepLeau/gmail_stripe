@@ -10,9 +10,12 @@ export interface ChatMessage {
 }
 
 /**
- * Future API response shape (target after replacing mock).
+ * API response shape from the billing-integrated sendMessage.
+ * Includes quota information alongside the AI reply.
  */
 export interface SendMessageResponse {
-  text: string
-  model?: string
+  reply: string
+  messagesUsed: number
+  messagesLimit: number
+  isOverLimit: boolean
 }

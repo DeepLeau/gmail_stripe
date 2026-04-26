@@ -8,6 +8,48 @@ const MIN_DELAY_MS = 500
 const MAX_DELAY_MS = 1000
 
 /**
+ * Response type for sendMessage including quota information
+ */
+export interface SendMessageResponse {
+  reply: string
+  messagesUsed: number
+  messagesLimit: number
+  isOverLimit: boolean
+}
+
+/**
+ * Call the billing usage increment endpoint.
+ * Returns the updated usage info from the server.
+ */
+async function incrementUsage(): Promise<{
+  messagesUsed: number
+  messagesLimit: number
+  isOverLimit: boolean
+} | null> {
+  try {
+    const response = await fetch('/api/billing/usage/increment', {
+      method: 'POST',
+      credentials: 'same-origin',
+    })
+
+    if (!response.ok) {
+      // If the endpoint doesn't exist or fails, continue without usage tracking
+      return null
+    }
+
+    const data = await response.json()
+    return {
+      messagesUsed: data.messagesUsed ?? 0,
+      messagesLimit: data.messagesLimit ?? 5,
+      isOverLimit: data.isOverLimit ?? false,
+    }
+  } catch {
+    // Network error - continue without usage tracking
+    return null
+  }
+}
+
+/**
  * Generates a random delay between MIN_DELAY_MS and MAX_DELAY_MS.
  * Extracted for testability — can be mocked with a deterministic value in tests.
  */
@@ -26,18 +68,43 @@ export function selectRandomResponse(): string {
 }
 
 /**
- * Mock implementation of the chat API.
+ * Mock implementation of the chat API with usage gating.
  *
- * Current signature (mock):
- *   async function sendMessage(content: string): Promise<string>
- *
- * Target signature (future replacement with real API):
- *   async function sendMessage(content: string): Promise<{ text: string; model?: string }>
- *
- * @param _content - The user's message content (ignored in mock, kept for signature compatibility)
- * @returns The AI response as a plain string
+ * @param content - The user's message content
+ * @param userId - The user's ID (optional, for future real API usage)
+ * @returns The AI response as a string (backward compatible) or SendMessageResponse with quota info
  */
-export async function sendMessage(_content: string): Promise<string> {
+export async function sendMessage(
+  content: string,
+  userId?: string
+): Promise<string | SendMessageResponse> {
+  // First, try to increment usage and check limits
+  const usageInfo = await incrementUsage()
+
+  // If usage info is available and user is over limit, return early
+  if (usageInfo && usageInfo.isOverLimit) {
+    return {
+      reply: '',
+      messagesUsed: usageInfo.messagesUsed,
+      messagesLimit: usageInfo.messagesLimit,
+      isOverLimit: true,
+    }
+  }
+
+  // Proceed with the chat API call
   await simulateDelay()
-  return selectRandomResponse()
+  const reply = selectRandomResponse()
+
+  // If we have usage info, include it in the response
+  if (usageInfo) {
+    return {
+      reply,
+      messagesUsed: usageInfo.messagesUsed,
+      messagesLimit: usageInfo.messagesLimit,
+      isOverLimit: usageInfo.isOverLimit,
+    }
+  }
+
+  // Fallback for backward compatibility (no usage tracking available)
+  return reply
 }

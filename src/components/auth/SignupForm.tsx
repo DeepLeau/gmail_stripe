@@ -18,10 +18,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  defaultEmail?: string
+}
+
+export function SignupForm({ defaultEmail = '' }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(defaultEmail)
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
