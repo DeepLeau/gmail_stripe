@@ -6,11 +6,13 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { UsageMeter } from './UsageMeter'
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [quotaError, setQuotaError] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -27,6 +29,25 @@ export function ChatInterface() {
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Clear any previous quota error
+    setQuotaError(null)
+
+    // Check quota before sending via the Stripe usage endpoint
+    try {
+      const countRes = await fetch('/api/stripe/usage')
+      if (countRes.ok) {
+        const data = await countRes.json()
+        const limit = data.units_limit ?? 0
+        const used = data.units_used ?? 0
+        if (limit > 0 && used >= limit) {
+          setQuotaError('Limite atteinte. Passez à un plan supérieur ↗')
+          return
+        }
+      }
+    } catch {
+      // Network error — continue sending, quota check is best-effort
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -58,6 +79,20 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Usage meter — between header and messages */}
+      <div className="shrink-0 mb-4 px-1">
+        <UsageMeter />
+      </div>
+
+      {/* Quota error banner */}
+      {quotaError && (
+        <div className="shrink-0 mb-3 px-3 py-2 rounded-lg bg-amber-50 border border-amber-200">
+          <p className="text-xs text-amber-700 font-medium">
+            {quotaError}
+          </p>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
