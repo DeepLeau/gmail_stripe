@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
@@ -52,7 +53,31 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
+async function startCheckout(): Promise<string | null> {
+  try {
+    const res = await fetch('/api/checkout', { method: 'POST' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.url ?? null
+  } catch {
+    return null
+  }
+}
+
 export function Pricing() {
+  const [isRedirecting, setIsRedirecting] = useState(false)
+
+  async function handleProClick() {
+    if (isRedirecting) return
+    setIsRedirecting(true)
+    const url = await startCheckout()
+    if (url) {
+      window.location.href = url
+    } else {
+      setIsRedirecting(false)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -268,8 +293,10 @@ export function Pricing() {
                       'var(--text-2)'
                   }
                 }}
+                onClick={plan.highlighted ? handleProClick : undefined}
+                disabled={plan.highlighted && isRedirecting}
               >
-                {plan.cta}
+                {plan.highlighted && isRedirecting ? 'Redirection...' : plan.cta}
               </button>
             </motion.div>
           ))}
