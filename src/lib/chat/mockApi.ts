@@ -25,19 +25,37 @@ export function selectRandomResponse(): string {
   return MOCK_RESPONSES[index]
 }
 
+export interface SendMessageOptions {
+  messagesUsed: number
+  messagesLimit: number
+}
+
 /**
  * Mock implementation of the chat API.
  *
  * Current signature (mock):
- *   async function sendMessage(content: string): Promise<string>
+ *   async function sendMessage(content: string, options?: SendMessageOptions): Promise<string>
  *
  * Target signature (future replacement with real API):
  *   async function sendMessage(content: string): Promise<{ text: string; model?: string }>
  *
  * @param _content - The user's message content (ignored in mock, kept for signature compatibility)
- * @returns The AI response as a plain string
+ * @param options  - Optional usage quota info for client-side gating
+ * @returns The AI response as a plain string, or throws if limit is reached
  */
-export async function sendMessage(_content: string): Promise<string> {
+export async function sendMessage(
+  _content: string,
+  options?: SendMessageOptions
+): Promise<string> {
+  // Client-side gating: block if limit reached
+  if (
+    options &&
+    options.messagesLimit > 0 &&
+    options.messagesUsed >= options.messagesLimit
+  ) {
+    throw new Error('LIMIT_REACHED')
+  }
+
   await simulateDelay()
   return selectRandomResponse()
 }
