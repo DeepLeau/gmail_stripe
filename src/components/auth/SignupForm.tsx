@@ -31,7 +31,7 @@ export function SignupForm() {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -77,7 +77,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -88,6 +88,15 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Link Stripe session if user just signed up (was redirected from /success)
+    if (data.user) {
+      try {
+        await fetch('/api/link-subscription', { method: 'POST' })
+      } catch {
+        // Non-critical: user is signed up regardless
+      }
     }
 
     router.push('/chat')

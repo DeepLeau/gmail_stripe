@@ -4,6 +4,22 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Paths accessible without auth (Stripe-related + auth pages)
+  const PUBLIC_PREFIXES = [
+    '/login',
+    '/signup',
+    '/success',
+    '/api/webhooks/stripe',
+    '/api/checkout',
+    '/api/link-subscription',
+    '/api/subscription/usage',
+  ]
+
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+  if (isPublic) {
+    return NextResponse.next({ request })
+  }
+
   const PROTECTED_PREFIXES = ['/chat']
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
 
