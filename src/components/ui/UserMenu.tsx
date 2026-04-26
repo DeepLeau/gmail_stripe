@@ -4,11 +4,18 @@ import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
 
-type UserMenuProps = {
-  userEmail: string
+interface PlanInfo {
+  name: string
+  messages_used: number
+  messages_limit: number | null
 }
 
-export function UserMenu({ userEmail }: UserMenuProps) {
+type UserMenuProps = {
+  userEmail: string
+  plan?: PlanInfo
+}
+
+export function UserMenu({ userEmail, plan }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -73,6 +80,17 @@ export function UserMenu({ userEmail }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
+
+          {/* Plan info */}
+          {plan && (
+            <div className="px-3 py-2.5 border-b border-[var(--border)]">
+              <p className="text-xs text-[var(--text-3)] mb-0.5">Plan</p>
+              <p className="text-sm text-[var(--text)] font-medium">{plan.name}</p>
+              <p className="text-xs text-[var(--text-3)] mt-0.5">
+                Messages&nbsp;: {plan.messages_used}{plan.messages_limit !== null ? `/${plan.messages_limit}` : ''} ce mois
+              </p>
+            </div>
+          )}
 
           {/* Bouton déconnexion */}
           <button

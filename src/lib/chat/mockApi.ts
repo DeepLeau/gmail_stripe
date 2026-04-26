@@ -1,4 +1,5 @@
 import { MOCK_RESPONSES, MOCK_RESPONSES_COUNT } from './responses'
+import { createClient } from '@/lib/supabase/client'
 
 /**
  * Simulated network delay range in milliseconds.
@@ -26,6 +27,34 @@ export function selectRandomResponse(): string {
 }
 
 /**
+ * Result type for sendMessage — supports limitReached flag.
+ */
+export type SendMessageResult =
+  | { limitReached: true }
+  | { limitReached: false; text: string }
+
+/**
+ * Attempts to decrement the user's message counter via RPC.
+ * Returns false if the user has no more messages remaining (limit reached).
+ * Silently returns true on any error (fallback: allow the call).
+ */
+async function tryDecrementUnits(): Promise<boolean> {
+  try {
+    const supabase = createClient()
+    if (!supabase) return true
+    const { data, error } = await supabase.rpc('decrement_units')
+    if (error) return true // Allow on RPC error
+    const result = data as { remaining?: number } | null
+    if (result && typeof result.remaining === 'number' && result.remaining <= 0) {
+      return false // Limit reached
+    }
+    return true
+  } catch {
+    return true // Allow on network error
+  }
+}
+
+/**
  * Mock implementation of the chat API.
  *
  * Current signature (mock):
@@ -38,6 +67,11 @@ export function selectRandomResponse(): string {
  * @returns The AI response as a plain string
  */
 export async function sendMessage(_content: string): Promise<string> {
+  const allowed = await tryDecrementUnits()
+  if (!allowed) {
+    return selectRandomResponse()
+  }
+
   await simulateDelay()
   return selectRandomResponse()
 }
