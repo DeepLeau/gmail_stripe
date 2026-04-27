@@ -15,19 +15,10 @@ type SignupFormState = {
   }
 }
 
-interface SelectedPlan {
-  name: string
-  amount: number
-}
-
-interface SignupFormProps {
-  selectedPlan?: SelectedPlan | null
-}
-
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm({ selectedPlan }: SignupFormProps) {
+export function SignupForm() {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -40,7 +31,7 @@ export function SignupForm({ selectedPlan }: SignupFormProps) {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = "L'adresse email est requise"
+      fieldErrors.email = 'L\'adresse email est requise'
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -73,12 +64,6 @@ export function SignupForm({ selectedPlan }: SignupFormProps) {
     return true
   }
 
-  function getSessionIdFromCookie(): string | undefined {
-    if (typeof document === 'undefined') return undefined
-    const match = document.cookie.match(/pending_checkout_session=([^;]+)/)
-    return match ? decodeURIComponent(match[1]) : undefined
-  }
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -105,60 +90,11 @@ export function SignupForm({ selectedPlan }: SignupFormProps) {
       return
     }
 
-    // Read session_id from cookie and link to Stripe session via the webhook link action
-    const sessionId = getSessionIdFromCookie()
-    if (sessionId) {
-      try {
-        await fetch('/api/stripe/link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId }),
-        })
-      } catch {
-        // Non-blocking
-      }
-      // Clear the cookie
-      document.cookie = 'pending_checkout_session=; Max-Age=0; path=/'
-    }
-
     router.push('/chat')
-  }
-
-  const formatAmount = (amount: number) => {
-    return (amount / 100).toFixed(2).replace('.', ',')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      {/* Plan info banner */}
-      {selectedPlan && (
-        <div className="flex items-center gap-3 p-3 rounded-xl bg-[var(--accent)]/5 border border-[var(--accent)]/15">
-          <div className="w-8 h-8 rounded-lg bg-[var(--accent)]/10 flex items-center justify-center shrink-0">
-            <svg
-              className="w-4 h-4 text-[var(--accent)]"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              strokeWidth={1.5}
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-              />
-            </svg>
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[var(--text)]">
-              Compte pour plan {selectedPlan.name}
-            </p>
-            <p className="text-xs text-[var(--text-2)]">
-              {formatAmount(selectedPlan.amount)} €/mois
-            </p>
-          </div>
-        </div>
-      )}
-
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
