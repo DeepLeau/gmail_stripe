@@ -7,7 +7,11 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  hasQuota?: boolean
+}
+
+export function ChatInterface({ hasQuota = true }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -24,6 +28,9 @@ export function ChatInterface() {
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
+
+    // Bloquer l'envoi si quota épuisé
+    if (!hasQuota) return
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
@@ -102,6 +109,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={!hasQuota}
+          placeholder={!hasQuota ? 'Limite atteinte — upgrade ton plan' : undefined}
         />
       </div>
     </div>

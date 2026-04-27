@@ -1,13 +1,14 @@
 import Link from 'next/link'
 
 type AuthCardProps = {
-  title: string
-  altLinkLabel: string
-  altLinkHref: string
-  children: React.ReactNode
+  title?: string
+  pendingPlan?: string | null
+  altLinkLabel?: string
+  altLinkHref?: string
+  children?: React.ReactNode
 }
 
-export function AuthCard({ title, altLinkLabel, altLinkHref, children }: AuthCardProps) {
+export function AuthCard({ title, pendingPlan, altLinkLabel, altLinkHref, children }: AuthCardProps) {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[var(--surface)] relative overflow-hidden px-4">
       {/* Orb gradients — reprenant le hero de la landing */}
@@ -29,13 +30,20 @@ export function AuthCard({ title, altLinkLabel, altLinkHref, children }: AuthCar
             {title}
           </h1>
 
+          {/* Banner plan confirmé */}
+          {pendingPlan && (
+            <div className="mb-5 px-4 py-3 rounded-xl bg-emerald-50 border border-emerald-200 text-sm text-emerald-800 text-center">
+              Votre abonnement <span className="font-semibold">{pendingPlan}</span> est confirmé. Créez votre compte pour y accéder.
+            </div>
+          )}
+
           {/* Contenu (formulaire) */}
           {children}
 
           {/* Lien alternatif */}
           <p className="text-center text-sm text-[var(--text-2)] mt-6">
             <Link
-              href={altLinkHref}
+              href={altLinkHref ?? '#'}
               className="text-[var(--accent)] hover:text-[var(--accent-hi)] font-medium transition-colors duration-150"
             >
               {altLinkLabel}

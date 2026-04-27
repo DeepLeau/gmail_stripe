@@ -24,7 +24,7 @@ const plans = [
     name: 'Pro',
     price: '19 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
     features: [
       { text: 'Questions illimitées', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
@@ -33,7 +33,7 @@ const plans = [
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
+    cta: 'Passer Pro',
     highlighted: true,
     badge: 'Recommandé',
   },
