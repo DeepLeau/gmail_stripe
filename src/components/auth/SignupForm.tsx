@@ -18,11 +18,7 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-interface SignupFormProps {
-  pendingSessionToken?: string
-}
-
-export function SignupForm({ pendingSessionToken }: SignupFormProps) {
+export function SignupForm() {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -35,7 +31,7 @@ export function SignupForm({ pendingSessionToken }: SignupFormProps) {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = "L'adresse email est requise"
+      fieldErrors.email = 'L\'adresse email est requise'
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -75,51 +71,26 @@ export function SignupForm({ pendingSessionToken }: SignupFormProps) {
 
     setState({ status: 'loading' })
 
-    // Create supabase client early and guard before any async work
     const supabase = createClient()
     if (!supabase) {
       setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
       return
     }
 
-    try {
-      let redirectTo = '/chat'
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    })
 
-      if (pendingSessionToken) {
-        // Signup via API route qui lie la session Stripe
-        const res = await fetch('/api/auth/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: email.trim(), password, pendingSessionToken }),
-        })
-
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}))
-          const message = body?.error ?? 'Une erreur est survenue lors de la création du compte'
-          setState({ status: 'error', errorMessage: message })
-          return
-        }
-      } else {
-        // Signup Supabase direct (comportement inchangé)
-        const { error } = await supabase.auth.signUp({
-          email: email.trim(),
-          password,
-        })
-
-        if (error) {
-          const message =
-            error.message === 'User already registered'
-              ? 'Un compte existe déjà avec cet email'
-              : 'Une erreur est survenue lors de la création du compte'
-          setState({ status: 'error', errorMessage: message })
-          return
-        }
-      }
-
-      router.push(redirectTo)
-    } catch {
-      setState({ status: 'error', errorMessage: 'Une erreur est survenue lors de la création du compte' })
+    if (error) {
+      const message = error.message === 'User already registered'
+        ? 'Un compte existe déjà avec cet email'
+        : 'Une erreur est survenue lors de la création du compte'
+      setState({ status: 'error', errorMessage: message })
+      return
     }
+
+    router.push('/chat')
   }
 
   return (
