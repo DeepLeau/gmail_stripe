@@ -39,7 +39,6 @@ export async function POST(request: NextRequest) {
   // même sans email pré-fourni. Stripe collecte l'email pendant le Checkout.
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
-    customer_creation: 'always',
     payment_method_types: ['card'],
     line_items: [{ price: priceId, quantity: 1 }],
     metadata: {
