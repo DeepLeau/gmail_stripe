@@ -4,15 +4,19 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 
 ## ✨ Features
 
-- **User Authentication** — Sign up and log in to access your personal email assistant
-- **AI Chat Interface** — Clean, modern chat experience with usage meters and upgrade prompts
+- **Natural language search** — Ask questions about your emails in plain English
+- **Smart email summaries** — Get instant summaries of any email thread
+- **Contact insights** — Identify key contacts by topic or project
+- **Question history** — Review all your past questions and answers
+- **Gmail & Outlook integration** — Connect your inbox in one click
+- **Secure data handling** — Encrypted storage, no data resale, revocable access
+- **AI Chat Interface** — Clean, modern chat experience at `/chat` with usage meters and upgrade prompts
+- **User Authentication** — Sign up and log in to access your personal chat
 - **Subscription Plans** — Choose from Start, Scale, and Team tiers with Stripe integration
-- **Secure Checkout** — Stripe-powered checkout flow for subscription management
-- **Usage Tracking** — Monitor your subscription usage in real-time
 
 ## 🛠️ Tech Stack
 
-- **Framework**: Next.js (App Router)
+- **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Animations**: Framer Motion
@@ -69,15 +73,15 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 STRIPE_SECRET_KEY=sk_test_...
 # STRIPE_WEBHOOK_SECRET — https://dashboard.stripe.com/webhooks
 STRIPE_WEBHOOK_SECRET=whsec_...
-# STRIPE_START_PRICE_ID — Dashboard Stripe > Products > Start > Pricing
-STRIPE_START_PRICE_ID=price_...
-# STRIPE_SCALE_PRICE_ID — Dashboard Stripe > Products > Scale > Pricing
-STRIPE_SCALE_PRICE_ID=price_...
-# STRIPE_TEAM_PRICE_ID — Dashboard Stripe > Products > Team > Pricing
-STRIPE_TEAM_PRICE_ID=price_...
+# STRIPE_PRICE_START — Dashboard Stripe > Products > Start > Pricing
+STRIPE_PRICE_START=price_...
+# STRIPE_PRICE_SCALE — Dashboard Stripe > Products > Scale > Pricing
+STRIPE_PRICE_SCALE=price_...
+# STRIPE_PRICE_TEAM — Dashboard Stripe > Products > Team > Pricing
+STRIPE_PRICE_TEAM=price_...
 # NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY — https://dashboard.stripe.com/apikeys
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-# NEXT_PUBLIC_BASE_URL — Your production URL (e.g. https://yoursite.com), or http://localhost:3000 for local dev
+# NEXT_PUBLIC_BASE_URL — Your app URL (e.g., http://localhost:3000 for dev)
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
@@ -87,84 +91,79 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000
 npm run dev
 ```
 
-Then open http://localhost:3000 in your browser.
+After a few seconds, you'll see:
 
-> 💡 **VS Code tip**: open the integrated terminal with `Ctrl+`` (or `Cmd+`` on Mac)
+```
+▲ Next.js 14.x.x
+- Local: http://localhost:3000
+```
+
+Open [http://localhost:3000](http://localhost:3000) in your browser to see the landing page.
+
+> 💡 **VS Code tip**: open the integrated terminal with Ctrl+` (or Cmd+` on Mac)
 
 ## 🔑 Environment Variables
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Public key for Supabase client |
-| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys | Secret API key (starts with `sk_`) |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks | Webhook signing secret (starts with `whsec_`) |
-| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products > Start plan > Pricing | Price ID for Start subscription tier |
-| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products > Scale plan > Pricing | Price ID for Scale subscription tier |
-| `STRIPE_TEAM_PRICE_ID` | Yes | Stripe Dashboard > Products > Team plan > Pricing | Price ID for Team subscription tier |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys | Publishable key (starts with `pk_`) |
-| `NEXT_PUBLIC_BASE_URL` | Yes | Set manually | Your app's URL (use `http://localhost:3000` for local development) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > **Project URL** | Your Supabase project connection URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > **anon/public key** | Public key for Supabase client-side auth |
+| `STRIPE_SECRET_KEY` | Yes | [Stripe Dashboard > API Keys](https://dashboard.stripe.com/apikeys) | Secret key for Stripe server-side operations (starts with `sk_`) |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | [Stripe Dashboard > API Keys](https://dashboard.stripe.com/apikeys) | Publishable key for Stripe client-side (starts with `pk_`) |
+| `STRIPE_WEBHOOK_SECRET` | Yes | [Stripe Dashboard > Webhooks](https://dashboard.stripe.com/webhooks) | Secret for verifying Stripe webhook events (starts with `whsec_`) |
+| `STRIPE_PRICE_START` | Yes | Stripe Dashboard > Products > **Start** > Pricing | Price ID for the Start subscription plan (starts with `price_`) |
+| `STRIPE_PRICE_SCALE` | Yes | Stripe Dashboard > Products > **Scale** > Pricing | Price ID for the Scale subscription plan (starts with `price_`) |
+| `STRIPE_PRICE_TEAM` | Yes | Stripe Dashboard > Products > **Team** > Pricing | Price ID for the Team subscription plan (starts with `price_`) |
+| `NEXT_PUBLIC_BASE_URL` | Yes | Your app's URL | Base URL for your app (use `http://localhost:3000` for local dev) |
 
-### Finding Supabase credentials
+**How to find your Supabase credentials:**
 
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+1. Go to [Supabase](https://supabase.com/) and log in
 2. Select your project
-3. Click **Project Settings** (gear icon)
-4. Under **API**, find:
-   - **Project URL** → copy into `NEXT_PUBLIC_SUPABASE_URL`
-   - **anon/public** key → copy into `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+3. Click **Project Settings** (the gear icon) in the left sidebar
+4. Click **API**
+5. Copy the **Project URL** and paste it as `NEXT_PUBLIC_SUPABASE_URL`
+6. Copy the **anon/public key** and paste it as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-### Creating Stripe Price IDs
+**How to create Stripe Price IDs:**
 
-1. Go to [Stripe Dashboard](https://dashboard.stripe.com)
-2. Navigate to **Products** > **Add product**
-3. Create three products: **Start**, **Scale**, and **Team**
-4. For each product, add a recurring price
-5. Copy each Price ID (starts with `price_`) into the corresponding variable
+1. Go to [Stripe Dashboard](https://dashboard.stripe.com/) and log in
+2. Go to **Products** and create or select a product (Start, Scale, Team)
+3. Click on the **Pricing** section for that product
+4. Copy the **Price ID** (starts with `price_`) and paste it as the corresponding variable
 
 ## 📁 Project Structure
 
-```
-src/
-├── app/                          # Next.js App Router pages and API routes
-│   ├── actions/                  # Server actions
-│   ├── api/                      # API route handlers
-│   │   ├── stripe/               # Stripe checkout and webhook endpoints
-│   │   ├── subscription/         # Subscription management endpoints
-│   ├── chat/                     # Chat page
-│   └── signup/                   # Signup page
-├── components/                  # React components
-│   ├── auth/                     # Authentication components
-│   ├── billing/                  # Billing and plan components
-│   ├── chat/                     # Chat interface components
-│   └── sections/                # Page section components
-├── lib/
-│   └── stripe/                   # Stripe client utilities and hooks
-├── middleware.ts                 # Next.js middleware for auth
-.env.example                      # Environment variables template
-```
+- **src/app** — Next.js App Router pages, API routes, and server actions
+- **src/components/auth** — Authentication UI components (signup form)
+- **src/components/chat** — Chat interface components (usage meter, upgrade banner)
+- **src/components/sections** — Landing page sections (pricing)
+- **src/lib/stripe** — Stripe client configuration, server config, and subscription plans
 
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-### Step by step:
+**Step by step:**
 
-1. **Import your repository** — Click "Import Git Repository" and select your GitHub repo
-2. **Configure project** — Vercel will auto-detect Next.js settings
-3. **Add environment variables** — Go to Settings > Environment Variables and add all variables from your `.env.local`:
+1. Click the button above or go to [vercel.com/new](https://vercel.com/new)
+2. Import your GitHub repository
+3. In the Vercel dashboard, go to **Settings > Environment Variables**
+4. Add all the environment variables from your `.env.local` file:
+
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `STRIPE_SECRET_KEY`
-   - `STRIPE_WEBHOOK_SECRET`
-   - `STRIPE_START_PRICE_ID`
-   - `STRIPE_SCALE_PRICE_ID`
-   - `STRIPE_TEAM_PRICE_ID`
    - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel deployment URL, e.g. `https://your-app.vercel.app`)
-4. **Deploy** — Click "Deploy"
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_PRICE_START`
+   - `STRIPE_PRICE_SCALE`
+   - `STRIPE_PRICE_TEAM`
+   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel deployment URL, e.g., `https://your-app.vercel.app`)
 
-> ⚠️ **Important**: After deploying, update your Stripe webhook URL to point to your production domain (e.g., `https://your-app.vercel.app/api/stripe/webhook`)
+5. Click **Deploy**
+
+> ⚠️ **Important**: After your first deployment, you need to set up your Stripe webhook to point to your production URL: `https://your-app.vercel.app/api/stripe/webhook`
 
 ## 📝 License
 
