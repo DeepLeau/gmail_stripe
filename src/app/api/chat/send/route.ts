@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getCurrentSubscription, decrementUnits } from '@/app/actions/subscription'
+import { getPlanDisplayName, type StripePlanName } from '@/lib/stripe/config'
 import { createServerClient } from '@supabase/ssr'
 
 export const dynamic = 'force-dynamic'
@@ -29,43 +31,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
-    // Check remaining units via RPC
-    const { data: quotaData, error: quotaError } = await supabase
-      .rpc('get_user_remaining_messages', {
-        p_user_id: user.id,
-      })
-
-    if (quotaError) {
-      console.error('[Chat/send] RPC error:', quotaError)
-      return NextResponse.json({ error: 'quota_check_failed' }, { status: 500 })
+    // Check subscription via Server Action
+    const subscriptionState = await getCurrentSubscription()
+    if (!subscriptionState) {
+      return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
     }
 
-    const remaining = quotaData ?? 0
-    if (remaining <= 0) {
-      return NextResponse.json({ error: 'limit_reached' }, { status: 403 })
+    const unitsLimit = subscriptionState.units_limit
+    const unitsUsed = subscriptionState.units_used
+    const unitsRemaining =
+      unitsLimit > 0 ? Math.max(0, unitsLimit - unitsUsed) : null
+
+    if (unitsRemaining === 0) {
+      const planDisplay = subscriptionState.plan
+        ? getPlanDisplayName(subscriptionState.plan as StripePlanName)
+        : 'Gratuit'
+      return NextResponse.json(
+        { error: 'limit_reached', plan: planDisplay },
+        { status: 403 }
+      )
     }
 
-    // Decrement units
-    const { error: decrementError } = await supabase.rpc('decrement_user_messages', {
-      p_user_id: user.id,
-      p_count: 1,
-    })
-
-    if (decrementError) {
-      console.error('[Chat/send] Decrement error:', decrementError)
+    // Decrement units after successful message processing
+    const decrementResult = await decrementUnits()
+    if (!decrementResult.success) {
+      console.warn('[Chat/send] DecrementUnits failed:', decrementResult.error)
+      // Don't block the message if decrement fails — log and continue
     }
 
     // Simulated AI response (replace with actual AI integration)
     const aiResponse = `Réponse simulée pour: "${content.trim()}"`
 
-    // Get updated units used
-    const { data: updatedQuota } = await supabase.rpc('get_user_remaining_messages', {
-      p_user_id: user.id,
-    })
-
     return NextResponse.json({
       text: aiResponse,
-      units_used: updatedQuota !== null ? Math.max(0, remaining - 1) : undefined,
+      units_remaining: decrementResult.remaining ?? undefined,
     })
   } catch (err) {
     console.error('[Chat/send] Error:', err)
