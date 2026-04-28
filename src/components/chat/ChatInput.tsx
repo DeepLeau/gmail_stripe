@@ -8,18 +8,9 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
-  disabled?: boolean
-  placeholder?: string
 }
 
-export function ChatInput({
-  value,
-  onChange,
-  onSubmit,
-  isLoading,
-  disabled = false,
-  placeholder = 'Pose une question...',
-}: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -48,7 +39,7 @@ export function ChatInput({
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading && !disabled) {
+      if (value.trim() && !isLoading) {
         onSubmit()
         // Reset textarea après envoi
         if (textareaRef.current) {
@@ -59,37 +50,29 @@ export function ChatInput({
     }
   }
 
-  const isDisabled = isLoading || disabled
+  const isDisabled = isLoading || !value.trim()
 
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault()
-        if (!isDisabled && value.trim()) onSubmit()
+        if (!isDisabled) onSubmit()
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
           textareaRef.current.style.overflowY = 'hidden'
         }
       }}
-      className={`flex items-end gap-3 border rounded-2xl px-4 py-3 shadow-sm transition-colors duration-150 ${
-        disabled
-          ? 'bg-gray-50 border-gray-200'
-          : 'bg-white border-gray-200'
-      }`}
+      className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
     >
       <textarea
         ref={textareaRef}
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder={placeholder}
+        placeholder="Pose une question..."
         rows={1}
-        disabled={isDisabled}
-        className={`flex-1 text-sm resize-none focus:outline-none min-h-[24px] transition-colors duration-150 ${
-          disabled
-            ? 'bg-transparent text-gray-400 placeholder:text-gray-300 cursor-not-allowed'
-            : 'bg-transparent text-gray-900 placeholder:text-gray-400'
-        }`}
+        disabled={isLoading}
+        className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
         style={{
           height: 'auto',
           overflowY: 'hidden',
@@ -99,12 +82,8 @@ export function ChatInput({
 
       <button
         type="submit"
-        disabled={isDisabled || !value.trim()}
-        className={`shrink-0 w-8 h-8 flex items-center justify-center rounded-lg transition-colors duration-150 disabled:cursor-not-allowed ${
-          disabled || !value.trim()
-            ? 'bg-gray-300 cursor-not-allowed'
-            : 'bg-blue-600 hover:bg-blue-700'
-        }`}
+        disabled={isDisabled}
+        className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
         aria-label="Envoyer"
       >
         <Send size={15} className="text-white" strokeWidth={2} />
