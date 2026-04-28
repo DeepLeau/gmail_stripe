@@ -6,14 +6,25 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { PlanBadge } from '@/components/ui/PlanBadge'
+import { UpgradePrompt } from '@/components/ui/UpgradePrompt'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [showUpgradePrompt, setShowUpgradePrompt] = useState(false)
+  const [noSubscription, setNoSubscription] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll automatique vers le bas après chaque message
+  const unitsRemaining = subscription?.units_remaining ?? null
+  const isLimitReached = unitsRemaining === 0
+
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -22,13 +33,23 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
+  useEffect(() => {
+    setShowUpgradePrompt(false)
+    setNoSubscription(false)
+  }, [])
+
+  async function handleSubmit(e?: FormEvent) {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimitReached) return
 
-    // Ajout du message utilisateur
+    // Si pas d'abonnement, rediriger vers /signup
+    if (!subscription) {
+      setNoSubscription(true)
+      return
+    }
+
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,9 +59,18 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
     try {
+      // Décrémenter le quota via l'endpoint
+      const decrementRes = await fetch('/api/subscription/chat', { method: 'POST' })
+
+      if (decrementRes.status === 429) {
+        setShowUpgradePrompt(true)
+        // Retirer le message utilisateur ajouté puisque l'envoi n'a pas eu lieu
+        setMessages((prev) => prev.slice(0, -1))
+        return
+      }
+
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -50,7 +80,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,9 +88,23 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Subscription warning banner */}
+      {isLimitReached && (
+        <div className="mb-4 shrink-0">
+          <UpgradePrompt message="Tu as atteint ta limite de messages pour ce mois." variant="inline" />
+        </div>
+      )}
+
+      {/* No subscription prompt */}
+      {noSubscription && !showUpgradePrompt && (
+        <div className="mb-4 shrink-0">
+          <UpgradePrompt message="Crée un compte pour accéder à Emind." variant="inline" />
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-        {messages.length === 0 && (
+        {messages.length === 0 && !showUpgradePrompt && !noSubscription && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
               <svg
@@ -97,11 +141,17 @@ export function ChatInterface() {
 
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
+        {showUpgradePrompt && (
+          <div className="mb-3">
+            <UpgradePrompt variant="banner" />
+          </div>
+        )}
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={isLimitReached}
         />
       </div>
     </div>
