@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { LogOut, Loader2, CreditCard } from 'lucide-react'
+import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
@@ -73,17 +73,6 @@ export function UserMenu({ userEmail }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
           </div>
-
-          {/* Lien Abonnement */}
-          <a
-            href="/settings/billing"
-            className="w-full flex items-center gap-2.5 px-3 h-9 text-sm
-                       text-[var(--text)] hover:bg-[var(--bg)]
-                       transition-colors duration-100 whitespace-nowrap"
-          >
-            <CreditCard size={14} strokeWidth={1.5} className="shrink-0" />
-            <span>Abonnement</span>
-          </a>
 
           {/* Bouton déconnexion */}
           <button
