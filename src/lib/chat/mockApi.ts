@@ -41,3 +41,43 @@ export async function sendMessage(_content: string): Promise<string> {
   await simulateDelay()
   return selectRandomResponse()
 }
+
+/**
+ * Response type for sendChatMessage API call.
+ */
+export interface ChatResponse {
+  text: string
+  units_used?: number
+  model?: string
+}
+
+/**
+ * API-compatible chat message sender.
+ * Calls the real /api/chat/send endpoint.
+ * 
+ * @param content - The user's message content
+ * @param _userId - User ID (kept for API compatibility, not used in mock)
+ * @returns Promise resolving to ChatResponse with AI text and units_used
+ */
+export async function sendChatMessage(
+  content: string,
+  _userId?: string
+): Promise<ChatResponse> {
+  const response = await fetch('/api/chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
+
+  if (!response.ok) {
+    if (response.status === 403) {
+      const error = await response.json()
+      if (error.error === 'limit_reached') {
+        throw new Error('limit_reached')
+      }
+    }
+    throw new Error('Failed to send message')
+  }
+
+  return response.json()
+}

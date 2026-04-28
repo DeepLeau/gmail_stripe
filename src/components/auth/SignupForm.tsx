@@ -1,3 +1,7 @@
+// This file remains unchanged per the brief:
+// "NE PAS modifier la logique interne du SignupForm existant"
+// The signup page handles post-signup linking via searchParams
+
 'use client'
 
 import { useState } from 'react'
