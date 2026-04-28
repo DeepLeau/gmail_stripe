@@ -6,9 +6,16 @@ import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
+  userPlan?: string
 }
 
-export function UserMenu({ userEmail }: UserMenuProps) {
+const PLAN_LABELS: Record<string, string> = {
+  start: 'Start',
+  scale: 'Scale',
+  team: 'Team',
+}
+
+export function UserMenu({ userEmail, userPlan }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -68,10 +75,23 @@ export function UserMenu({ userEmail }: UserMenuProps) {
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email */}
+          {/* Email + Plan badge */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
-            <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
+            <div className="flex items-center gap-2">
+              <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
+              {userPlan && (
+                <span
+                  className="inline-flex px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest shrink-0"
+                  style={{
+                    background: 'var(--accent)',
+                    color: '#fff',
+                  }}
+                >
+                  {PLAN_LABELS[userPlan] ?? userPlan}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Bouton déconnexion */}
