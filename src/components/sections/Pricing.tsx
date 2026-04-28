@@ -1,7 +1,9 @@
 'use client'
 
+import { useState, type FormEvent } from 'react'
+import { useRouter } from 'next/navigation'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
 
 const plans = [
   {
@@ -19,6 +21,7 @@ const plans = [
     ],
     cta: 'Commencer gratuitement',
     highlighted: false,
+    stripePlan: 'start' as const,
   },
   {
     name: 'Pro',
@@ -36,6 +39,7 @@ const plans = [
     cta: 'Passer à Pro',
     highlighted: true,
     badge: 'Recommandé',
+    stripePlan: 'pro' as const,
   },
 ]
 
@@ -53,6 +57,33 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const router = useRouter()
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+  const handleCheckout = async (plan: 'start' | 'pro', isAuthenticated: boolean) => {
+    if (!isAuthenticated) {
+      router.push('/auth')
+      return
+    }
+
+    setLoadingPlan(plan)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json()
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch {
+      // error silently
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +133,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Pro quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -230,26 +261,31 @@ export function Pricing() {
               {/* CTA */}
               <button
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+                disabled={loadingPlan !== null}
                 style={
                   plan.highlighted
                     ? {
                         backgroundColor: 'var(--accent)',
                         color: '#fff',
                         boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        cursor: loadingPlan !== null ? 'not-allowed' : 'pointer',
+                        opacity: loadingPlan !== null ? 0.7 : 1,
                       }
                     : {
                         backgroundColor: 'transparent',
                         color: 'var(--text-2)',
                         border: '1px solid var(--border-md)',
+                        cursor: loadingPlan !== null ? 'not-allowed' : 'pointer',
+                        opacity: loadingPlan !== null ? 0.7 : 1,
                       }
                 }
                 onMouseEnter={(e) => {
-                  if (plan.highlighted) {
+                  if (plan.highlighted && loadingPlan === null) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
                       'var(--accent-hi)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform =
                       'translateY(-1px)'
-                  } else {
+                  } else if (!plan.highlighted && loadingPlan === null) {
                     ;(e.currentTarget as HTMLButtonElement).style.borderColor =
                       'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.color =
@@ -268,8 +304,16 @@ export function Pricing() {
                       'var(--text-2)'
                   }
                 }}
+                onClick={() => handleCheckout(plan.stripePlan, true)}
               >
-                {plan.cta}
+                {loadingPlan === plan.stripePlan ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    Redirection…
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
