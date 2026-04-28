@@ -4,10 +4,9 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -19,18 +18,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-interface SignupFormProps {
-  pendingSessionId?: string | null
-}
-
-export function SignupForm({ pendingSessionId }: SignupFormProps) {
+export function SignupForm() {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading' || state.status === 'linking'
+  const isLoading = state.status === 'loading'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -93,31 +88,6 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
-    }
-
-    // If we have a pending Stripe session, link it before redirecting
-    if (pendingSessionId) {
-      setState({ status: 'linking' })
-      
-      try {
-        const result = await linkStripeSessionToUser(pendingSessionId)
-        
-        if (!result.success) {
-          // pending_not_found = webhook pas encore arrivé, retry possible
-          if (result.error === 'pending_not_found' && result.retry) {
-            // Retry après 2s
-            await new Promise(r => setTimeout(r, 2000))
-            const retry = await linkStripeSessionToUser(pendingSessionId)
-            if (!retry.success) {
-              console.warn('Linking failed after retry, proceeding anyway')
-            }
-          } else {
-            console.warn('Linking failed:', result.error)
-          }
-        }
-      } catch (err) {
-        console.warn('Linking exception, proceeding anyway:', err)
-      }
     }
 
     router.push('/chat')
@@ -224,15 +194,10 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
                    text-sm font-medium transition-colors duration-150
                    disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
-        {state.status === 'loading' ? (
+        {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
-          </>
-        ) : state.status === 'linking' ? (
-          <>
-            <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Liaison de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
