@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
@@ -97,21 +98,25 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
     // If we have a pending Stripe session, link it before redirecting
     if (pendingSessionId) {
       setState({ status: 'linking' })
-
+      
       try {
-        const res = await fetch('/api/stripe/pending-link', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: pendingSessionId }),
-        })
-
-        if (!res.ok) {
-          // Non-blocking — still redirect to chat even if linkage fails
-          console.warn('Failed to link Stripe session, proceeding to chat anyway')
+        const result = await linkStripeSessionToUser(pendingSessionId)
+        
+        if (!result.success) {
+          // pending_not_found = webhook pas encore arrivé, retry possible
+          if (result.error === 'pending_not_found' && result.retry) {
+            // Retry après 2s
+            await new Promise(r => setTimeout(r, 2000))
+            const retry = await linkStripeSessionToUser(pendingSessionId)
+            if (!retry.success) {
+              console.warn('Linking failed after retry, proceeding anyway')
+            }
+          } else {
+            console.warn('Linking failed:', result.error)
+          }
         }
-      } catch {
-        // Non-blocking network error
-        console.warn('Failed to link Stripe session, proceeding to chat anyway')
+      } catch (err) {
+        console.warn('Linking exception, proceeding anyway:', err)
       }
     }
 
