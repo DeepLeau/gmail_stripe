@@ -7,11 +7,23 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription?: {
+    plan: string | null
+    units_used: number
+    units_limit: number | null
+    units_remaining: number | null
+    status: string
+  }
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps = {}) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const isLimitReached = subscription?.units_remaining === 0
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -26,7 +38,7 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -102,6 +114,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          isLimitReached={isLimitReached}
         />
       </div>
     </div>

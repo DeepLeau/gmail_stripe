@@ -8,9 +8,10 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  isLimitReached?: boolean
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, isLimitReached }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const adjustHeight = useCallback(() => {
@@ -39,7 +40,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isLoading) {
+      if (value.trim() && !isLoading && !isLimitReached) {
         onSubmit()
         // Reset textarea après envoi
         if (textareaRef.current) {
@@ -50,7 +51,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
     }
   }
 
-  const isDisabled = isLoading || !value.trim()
+  const isDisabled = isLoading || !value.trim() || isLimitReached
 
   return (
     <form
@@ -69,9 +70,9 @@ export function ChatInput({ value, onChange, onSubmit, isLoading }: ChatInputPro
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        placeholder="Pose une question..."
+        placeholder={isLimitReached ? 'Limite atteinte...' : 'Pose une question...'}
         rows={1}
-        disabled={isLoading}
+        disabled={isLoading || isLimitReached}
         className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
         style={{
           height: 'auto',

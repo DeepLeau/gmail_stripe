@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
@@ -19,6 +20,7 @@ const plans = [
     ],
     cta: 'Commencer gratuitement',
     highlighted: false,
+    plan: 'start',
   },
   {
     name: 'Pro',
@@ -36,6 +38,7 @@ const plans = [
     cta: 'Passer à Pro',
     highlighted: true,
     badge: 'Recommandé',
+    plan: 'scale',
   },
 ]
 
@@ -53,6 +56,27 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+
+  const handlePlanClick = async (plan: string) => {
+    setLoadingPlan(plan)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan }),
+      })
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch {
+      // silent
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -229,7 +253,7 @@ export function Pricing() {
 
               {/* CTA */}
               <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={
                   plan.highlighted
                     ? {
@@ -243,6 +267,8 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                onClick={() => handlePlanClick(plan.plan)}
+                disabled={loadingPlan !== null}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -269,7 +295,7 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingPlan === plan.plan ? 'Redirection...' : plan.cta}
               </button>
             </motion.div>
           ))}
