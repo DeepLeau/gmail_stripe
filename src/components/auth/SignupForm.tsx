@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,14 +18,18 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  pendingSessionId?: string | null
+}
+
+export function SignupForm({ pendingSessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -88,6 +92,27 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // If we have a pending Stripe session, link it before redirecting
+    if (pendingSessionId) {
+      setState({ status: 'linking' })
+
+      try {
+        const res = await fetch('/api/stripe/pending-link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sessionId: pendingSessionId }),
+        })
+
+        if (!res.ok) {
+          // Non-blocking — still redirect to chat even if linkage fails
+          console.warn('Failed to link Stripe session, proceeding to chat anyway')
+        }
+      } catch {
+        // Non-blocking network error
+        console.warn('Failed to link Stripe session, proceeding to chat anyway')
+      }
     }
 
     router.push('/chat')
@@ -194,10 +219,15 @@ export function SignupForm() {
                    text-sm font-medium transition-colors duration-150
                    disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
-        {isLoading ? (
+        {state.status === 'loading' ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : state.status === 'linking' ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Liaison de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
