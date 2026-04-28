@@ -6,8 +6,24 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { PlanBadge } from './PlanBadge'
+import { UpgradePrompt } from './UpgradePrompt'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan?: string | null
+  messagesUsed?: number
+  messagesLimit?: number | null
+  resetAt?: string | null
+  subscriptionId?: string | null
+}
+
+export function ChatInterface({
+  plan,
+  messagesUsed = 0,
+  messagesLimit = null,
+  resetAt,
+  subscriptionId,
+}: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -21,6 +37,11 @@ export function ChatInterface() {
       })
     }
   }, [messages.length])
+
+  // Computed states for gating
+  const hasSubscription = plan !== null && plan !== undefined && plan !== 'free'
+  const isAtLimit = messagesLimit !== null && messagesUsed >= messagesLimit
+  const isNearLimit = messagesLimit !== null && !isAtLimit && messagesUsed >= messagesLimit * 0.9
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -95,14 +116,47 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
+      {/* PlanBadge dans le header du chat */}
+      {hasSubscription && (
+        <div className="shrink-0 mb-3">
+          <PlanBadge
+            plan={plan!}
+            messagesUsed={messagesUsed}
+            messagesLimit={messagesLimit!}
+            resetAt={resetAt}
+          />
+        </div>
+      )}
+
+      {/* UpgradePrompt en overlay si proche de la limite */}
+      {isNearLimit && (
+        <div className="shrink-0 mb-3">
+          <UpgradePrompt
+            variant="soft"
+            messagesUsed={messagesUsed}
+            messagesLimit={messagesLimit!}
+            resetAt={resetAt}
+          />
+        </div>
+      )}
+
+      {/* Input fixe en bas — désactivé si limite atteinte */}
       <div className="shrink-0 pt-4">
-        <ChatInput
-          value={inputValue}
-          onChange={setInputValue}
-          onSubmit={() => handleSubmit()}
-          isLoading={isLoading}
-        />
+        {isAtLimit ? (
+          <UpgradePrompt
+            variant="blocked"
+            messagesUsed={messagesUsed}
+            messagesLimit={messagesLimit!}
+            resetAt={resetAt}
+          />
+        ) : (
+          <ChatInput
+            value={inputValue}
+            onChange={setInputValue}
+            onSubmit={() => handleSubmit()}
+            isLoading={isLoading}
+          />
+        )}
       </div>
     </div>
   )
