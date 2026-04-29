@@ -2,129 +2,16 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
+import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
-import { UsageBar } from '@/components/chat/UsageBar'
-import type { SubscriptionData } from '@/lib/stripe/config'
-import { UNIT_LABEL, UNIT_LABEL_PLURAL } from '@/lib/stripe/config'
 
-interface ChatInterfaceProps {
-  subscription?: SubscriptionData | null
-}
-
-interface SendMessageResponse {
-  text: string
-  units_used?: number
-}
-
-interface LimitReachedOverlayProps {
-  planName: string | null
-  onUpgrade: () => void
-}
-
-function LimitReachedOverlay({ planName, onUpgrade }: LimitReachedOverlayProps) {
-  return (
-    <div
-      className="absolute inset-0 z-50 flex items-center justify-center rounded-xl"
-      style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}
-    >
-      <div
-        className="flex flex-col items-center gap-4 p-8 rounded-2xl text-center max-w-sm mx-4"
-        style={{ backgroundColor: 'var(--bg)', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}
-      >
-        {/* Icon */}
-        <div
-          className="w-14 h-14 rounded-full flex items-center justify-center"
-          style={{ backgroundColor: 'var(--accent-light)' }}
-        >
-          <svg
-            className="w-7 h-7"
-            style={{ color: 'var(--accent)' }}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"
-            />
-          </svg>
-        </div>
-
-        {/* Title */}
-        <div>
-          <h3
-            className="text-lg font-semibold mb-2"
-            style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
-          >
-            Limite de {UNIT_LABEL_PLURAL.toLowerCase()} atteinte
-          </h3>
-          <p className="text-sm" style={{ color: 'var(--text-2)', lineHeight: 1.6 }}>
-            {planName
-              ? `Votre plan ${planName} a atteint sa limite mensuelle.`
-              : 'Vous avez atteint votre limite de messages mensuelle.'}
-          </p>
-        </div>
-
-        {/* CTA */}
-        <button
-          onClick={onUpgrade}
-          className="w-full h-11 px-6 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
-          style={{
-            backgroundColor: 'var(--accent)',
-            color: '#fff',
-            boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
-          }}
-          onMouseEnter={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-hi)'
-            ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
-          }}
-          onMouseLeave={(e) => {
-            ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
-            ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-          }}
-        >
-          <span>Passer à un plan supérieur</span>
-          <svg
-            className="w-4 h-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={2}
-          >
-            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  )
-}
-
-export function ChatInterface({ subscription }: ChatInterfaceProps) {
+export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
-  const [limitReached, setLimitReached] = useState(false)
-  const [localUnitsUsed, setLocalUnitsUsed] = useState(subscription?.units_used ?? 0)
   const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Sync local units with subscription changes
-  useEffect(() => {
-    if (subscription?.units_used !== undefined) {
-      setLocalUnitsUsed(subscription.units_used)
-    }
-  }, [subscription?.units_used])
-
-  // Check if limit is already reached on mount
-  useEffect(() => {
-    const remaining = subscription?.units_remaining ?? null
-    if (remaining !== null && remaining <= 0) {
-      setLimitReached(true)
-    }
-  }, [subscription?.units_remaining])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -135,18 +22,11 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
     }
   }, [messages.length])
 
-  async function handleSubmit(e?: FormEvent) {
+  const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
-
-    // Check limit before sending
-    const remaining = subscription?.units_remaining ?? null
-    if (remaining !== null && remaining <= 0) {
-      setLimitReached(true)
-      return
-    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -161,79 +41,23 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
     // Appel API
     setIsLoading(true)
     try {
-      const response = await fetch('/api/chat/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: trimmed }),
-      })
-
-      if (response.status === 403) {
-        const errorData = await response.json()
-        if (errorData.error === 'limit_reached') {
-          setLimitReached(true)
-          // Remove the user message we just added since the request was blocked
-          setMessages((prev) => prev.slice(0, -1))
-          return
-        }
-      }
-
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'envoi du message')
-      }
-
-      const data: SendMessageResponse = await response.json()
-
-      // Update local units_used from server response
-      if (data.units_used !== undefined) {
-        setLocalUnitsUsed(data.units_used)
-        // Also check if we've hit the limit
-        const newRemaining = subscription?.units_limit !== null && subscription?.units_limit !== undefined
-          ? Math.max(0, subscription.units_limit - data.units_used)
-          : null
-        if (newRemaining !== null && newRemaining <= 0) {
-          setLimitReached(true)
-        }
-      }
-
+      const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: data.text,
+        content: response,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Remove the user message on error
-      setMessages((prev) => prev.slice(0, -1))
-      // Could add error state here
+      // Erreur silencieuse — could add error state here
     } finally {
       setIsLoading(false)
     }
   }
 
-  function handleUpgrade() {
-    window.location.href = '/#pricing'
-  }
-
-  // Compute display values from local state for immediate feedback
-  const displayUnitsUsed = localUnitsUsed
-  const displayUnitsLimit = subscription?.units_limit ?? null
-  const displayUnitsRemaining =
-    displayUnitsLimit !== null ? Math.max(0, displayUnitsLimit - displayUnitsUsed) : null
-
   return (
-    <div className="relative flex flex-col h-full py-6">
-      {/* UsageBar - mounted under header, above messages */}
-      {subscription?.plan && (
-        <div className="mb-4">
-          <UsageBar
-            plan={subscription.plan}
-            unitsUsed={displayUnitsUsed}
-            unitsLimit={displayUnitsLimit}
-          />
-        </div>
-      )}
-
+    <div className="flex flex-col h-full py-6">
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -280,14 +104,6 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
           isLoading={isLoading}
         />
       </div>
-
-      {/* Limit reached overlay */}
-      {limitReached && (
-        <LimitReachedOverlay
-          planName={subscription?.plan ?? null}
-          onUpgrade={handleUpgrade}
-        />
-      )}
     </div>
   )
 }
