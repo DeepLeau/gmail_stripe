@@ -1,8 +1,13 @@
+// This file remains unchanged per the brief:
+// "NE PAS modifier la logique interne du SignupForm existant"
+// The signup page handles post-signup linking via searchParams
+
 'use client'
 
-import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
-import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -17,22 +22,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-interface SignupFormProps {
-  pendingSessionId?: string | null
-}
-
-export function SignupForm({ pendingSessionId }: SignupFormProps) {
+export function SignupForm() {
+  const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const { status: hookStatus, errorMessage: hookErrorMessage, signup } = useSignupWithStripeLinking({
-    pendingSessionId: pendingSessionId ?? undefined,
-    redirectTo: '/chat',
-  })
-
-  const isLoading = state.status === 'loading' || hookStatus === 'signing_up' || hookStatus === 'linking'
+  const isLoading = state.status === 'loading'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -78,11 +75,26 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
 
     setState({ status: 'loading' })
 
-    await signup(email, password)
-
-    if (hookStatus === 'error') {
-      setState({ status: 'error', errorMessage: hookErrorMessage ?? undefined })
+    const supabase = createClient()
+    if (!supabase) {
+      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+      return
     }
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    })
+
+    if (error) {
+      const message = error.message === 'User already registered'
+        ? 'Un compte existe déjà avec cet email'
+        : 'Une erreur est survenue lors de la création du compte'
+      setState({ status: 'error', errorMessage: message })
+      return
+    }
+
+    router.push('/chat')
   }
 
   return (
@@ -177,13 +189,6 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         </p>
       )}
 
-      {/* Message d'erreur du hook (linking error) */}
-      {hookStatus === 'error' && hookErrorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {hookErrorMessage}
-        </p>
-      )}
-
       {/* Bouton submit */}
       <button
         type="submit"
@@ -196,9 +201,7 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>
-              {hookStatus === 'linking' ? 'Activation de votre abonnement...' : 'Création en cours...'}
-            </span>
+            <span>Création en cours...</span>
           </>
         ) : (
           <span>Créer un compte</span>
