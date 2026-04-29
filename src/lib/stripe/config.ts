@@ -12,7 +12,7 @@
 import Stripe from 'stripe'
 
 // ─── Type des plans ─────────────────────────────────────────────────────────
-export type StripePlanName = 'start' | 'scale' | 'team'
+export type StripePlanName = 'starter' | 'growth' | 'pro'
 
 export interface PlanConfig {
   id: StripePlanName
@@ -22,9 +22,9 @@ export interface PlanConfig {
 }
 
 const PLANS: Record<StripePlanName, PlanConfig> = {
-  start: { id: 'start', priceId: process.env.STRIPE_START_PRICE_ID ?? '', unitsLimit: 10, displayName: 'Start' },
-  scale: { id: 'scale', priceId: process.env.STRIPE_SCALE_PRICE_ID ?? '', unitsLimit: 50, displayName: 'Scale' },
-  team: { id: 'team', priceId: process.env.STRIPE_TEAM_PRICE_ID ?? '', unitsLimit: 100, displayName: 'Team' },
+  starter: { id: 'starter', priceId: process.env.STRIPE_STARTER_PRICE_ID ?? '', unitsLimit: 50, displayName: 'Starter' },
+  growth: { id: 'growth', priceId: process.env.STRIPE_GROWTH_PRICE_ID ?? '', unitsLimit: 200, displayName: 'Growth' },
+  pro: { id: 'pro', priceId: process.env.STRIPE_PRO_PRICE_ID ?? '', unitsLimit: 1000, displayName: 'Pro' },
 }
 
 // Re-export du record pour les consommateurs qui veulent itérer sur tous les plans
@@ -80,23 +80,6 @@ export function getPlanByPriceId(priceId: string): StripePlanName | null {
 }
 
 // ─── Type canonique pour l'UI ───────────────────────────────────────────────
-//
-// Round 10 — ce type est exporté par le template pour que les consommateurs
-// (chat/page.tsx, ChatInterface, UserMenu...) ne l'inventent JAMAIS avec des
-// noms hallucinés. Cf. Run #26 : le compileAndFix avait fabriqué un type
-// fantôme avec des noms incohérents avec la DB qui stocke en units_*.
-//
-// Tous les fichiers consommateurs DOIVENT importer ce type :
-//   import type { SubscriptionData } from '@/lib/stripe/config'
-//
-// Shape :
-// - plan : slug du plan actif ('start', 'scale', ...) ou null si pas d'abo
-// - units_used : compteur consommé sur la période courante
-// - units_limit : limite du plan ; null si pas d'abo (= illimité côté UI = 'Free')
-// - units_remaining : units_limit - units_used, clampé à 0 ; null si pas de limite
-// - status : 'free' | 'active' | 'past_due' | 'canceled' | 'incomplete' | etc.
-//   (correspond au subscription_status de la table user_subscriptions, plus 'free'
-//    pour les users sans ligne ou avec subscription_status = 'free')
 export interface SubscriptionData {
   plan: string | null
   units_used: number

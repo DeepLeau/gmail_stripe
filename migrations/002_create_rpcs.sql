@@ -174,9 +174,9 @@ BEGIN
   -- SQL, donc on hardcode le mapping plan->limit ici, généré par le moteur de rendu
   -- via la variable plan_limit_case_when_lines (substituée au templating).
   v_units_limit := CASE v_pending.plan
-    WHEN 'start' THEN 10
-    WHEN 'scale' THEN 50
-    WHEN 'team' THEN 100
+    WHEN 'starter' THEN 50
+    WHEN 'growth' THEN 200
+    WHEN 'pro' THEN 1000
     ELSE 0
   END;
 
