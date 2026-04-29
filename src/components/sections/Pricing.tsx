@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
-type PlanId = 'starter' | 'growth' | 'pro'
+type PlanId = 'start' | 'scale' | 'team'
 
 interface PlanConfig {
   id: PlanId
@@ -21,58 +21,58 @@ interface PlanConfig {
 
 const plans: PlanConfig[] = [
   {
-    id: 'starter',
-    name: 'Starter',
+    id: 'start',
+    name: 'Start',
     price: '9 €',
     period: 'mois',
     description: 'Pour découvrir Emind et vos capacités de base.',
-    messagesLimit: 50,
+    messagesLimit: 10,
     features: [
-      { text: '50 messages / mois', included: true },
+      { text: '10 messages / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Réponses en 10 secondes', included: true },
       { text: 'Support par email', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Choisir Starter',
+    cta: 'Choisir Start',
     highlighted: false,
   },
   {
-    id: 'growth',
-    name: 'Growth',
+    id: 'scale',
+    name: 'Scale',
     price: '29 €',
     period: 'mois',
     description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
-    messagesLimit: 200,
+    messagesLimit: 50,
     features: [
-      { text: '200 messages / mois', included: true },
+      { text: '50 messages / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Réponses en 5 secondes', included: true },
       { text: 'Support prioritaire', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Historique illimité', included: true },
     ],
-    cta: 'Choisir Growth',
+    cta: 'Choisir Scale',
     highlighted: true,
     badge: 'Recommandé',
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    price: '79 €',
+    id: 'team',
+    name: 'Team',
+    price: '59 €',
     period: 'mois',
     description: 'Pour les équipes qui maximisent leur productivité.',
-    messagesLimit: 1000,
+    messagesLimit: 100,
     features: [
-      { text: '1000 messages / mois', included: true },
+      { text: '100 messages / mois', included: true },
       { text: 'Boîtes mail illimitées', included: true },
       { text: 'Réponses en 3 secondes', included: true },
       { text: 'Support prioritaire', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Historique illimité', included: true },
     ],
-    cta: 'Choisir Pro',
+    cta: 'Choisir Team',
     highlighted: false,
   },
 ]
@@ -90,6 +90,7 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
+// Spinner SVG for loading state
 function SpinnerIcon() {
   return (
     <svg
@@ -167,6 +168,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
             }
       }
     >
+      {/* Top accent line for highlighted plan */}
       {plan.highlighted && (
         <div
           className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -176,6 +178,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
         />
       )}
 
+      {/* Badge */}
       {plan.badge && (
         <div className="flex justify-center">
           <span
@@ -190,6 +193,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
         </div>
       )}
 
+      {/* Plan name + description */}
       <div>
         <p
           className="text-lg font-semibold tracking-tight mb-1"
@@ -204,6 +208,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
           {plan.description}
         </p>
 
+        {/* Price */}
         <div className="flex items-baseline gap-1.5 mb-2">
           <span
             className="text-4xl font-bold tracking-tight"
@@ -226,11 +231,13 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
         </p>
       </div>
 
+      {/* Divider */}
       <div
         className="h-px w-full"
         style={{ backgroundColor: 'var(--border)' }}
       />
 
+      {/* Features */}
       <ul className="flex flex-col gap-3 flex-1">
         {plan.features.map((feature, j) => (
           <li
@@ -260,6 +267,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
         ))}
       </ul>
 
+      {/* CTA Button */}
       <button
         onClick={() => onSelect(plan.id)}
         disabled={isLoading}
@@ -315,6 +323,7 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
         )}
       </button>
 
+      {/* Error message under the card */}
       {error && <ErrorMessage message={error} />}
     </motion.div>
   )
@@ -323,9 +332,9 @@ function PlanCard({ plan, isLoading, error, onSelect }: PlanCardProps) {
 export function Pricing() {
   const [loadingPlan, setLoadingPlan] = useState<PlanId | null>(null)
   const [errors, setErrors] = useState<Record<PlanId, string | null>>({
-    starter: null,
-    growth: null,
-    pro: null,
+    start: null,
+    scale: null,
+    team: null,
   })
 
   async function handleSelectPlan(planId: PlanId) {
@@ -333,7 +342,7 @@ export function Pricing() {
     setErrors((prev) => ({ ...prev, [planId]: null }))
 
     try {
-      const res = await fetch('/api/stripe/checkout', {
+      const res = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ plan: planId }),
@@ -365,6 +374,7 @@ export function Pricing() {
       style={{ backgroundColor: 'var(--surface)' }}
     >
       <div className="max-w-4xl mx-auto">
+        {/* Header */}
         <div className="text-center mb-14">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -410,6 +420,7 @@ export function Pricing() {
           </motion.p>
         </div>
 
+        {/* Cards */}
         <motion.div
           variants={containerVariants}
           initial="hidden"

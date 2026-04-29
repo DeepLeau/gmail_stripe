@@ -1,10 +1,16 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
 import { UserMenu } from '@/components/ui/UserMenu'
-import { getCurrentSubscription } from '@/app/actions/subscription'
-import type { SubscriptionData } from '@/lib/stripe/config'
 import { createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
+
+interface SubscriptionData {
+  plan: string | null
+  units_limit: number | null
+  units_used: number
+  subscription_status: string
+  current_period_end: string | null
+}
 
 export default async function ChatPage() {
   const supabase = await createClient()
@@ -14,25 +20,31 @@ export default async function ChatPage() {
 
   const userEmail = user?.email ?? ''
 
-  const subscriptionState = await getCurrentSubscription()
+  // Fetch subscription data from user_subscriptions table
+  let subscription: SubscriptionData | null = null
+  if (user) {
+    const { data: subData } = await supabase
+      .from('user_subscriptions')
+      .select('plan, units_limit, units_used, subscription_status, current_period_end')
+      .eq('user_id', user.id)
+      .single()
 
-  const subscription: SubscriptionData | null = subscriptionState
-    ? {
-        plan: subscriptionState.plan,
-        units_used: subscriptionState.units_used,
-        units_limit: subscriptionState.units_limit,
-        units_remaining:
-          subscriptionState.units_limit !== 0
-            ? Math.max(0, subscriptionState.units_limit - subscriptionState.units_used)
-            : null,
-        status: subscriptionState.subscription_status,
+    if (subData) {
+      subscription = {
+        plan: subData.plan,
+        units_limit: subData.units_limit,
+        units_used: subData.units_used ?? 0,
+        subscription_status: subData.subscription_status ?? 'free',
+        current_period_end: subData.current_period_end?.toString() ?? null,
       }
-    : null
+    }
+  }
 
+  // Compute units_remaining
   const unitsLimit = subscription?.units_limit ?? null
   const unitsUsed = subscription?.units_used ?? 0
   const unitsRemaining =
-    unitsLimit !== null && unitsLimit > 0 ? Math.max(0, unitsLimit - unitsUsed) : null
+    unitsLimit !== null ? Math.max(0, unitsLimit - unitsUsed) : null
 
   return (
     <main className="flex flex-col h-screen bg-white">
@@ -53,7 +65,7 @@ export default async function ChatPage() {
               units_used: unitsUsed,
               units_limit: unitsLimit,
               units_remaining: unitsRemaining,
-              status: subscription?.status ?? 'free',
+              status: subscription?.subscription_status ?? 'free',
             }}
           />
         </div>
