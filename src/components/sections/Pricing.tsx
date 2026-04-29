@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
@@ -54,33 +53,6 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
-  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
-  const [errorMessage, setErrorMessage] = useState<string | null>(null)
-
-  async function handleCheckout(planSlug: string) {
-    setLoadingPlan(planSlug)
-    setErrorMessage(null)
-    try {
-      const res = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ plan: planSlug }),
-      })
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
-      }
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      }
-    } catch (err) {
-      console.error('Checkout error:', err)
-      setErrorMessage(err instanceof Error ? err.message : 'Une erreur est survenue')
-      setLoadingPlan(null)
-    }
-  }
-
   return (
     <section
       id="pricing"
@@ -134,15 +106,6 @@ export function Pricing() {
           </motion.p>
         </div>
 
-        {/* Error message */}
-        {errorMessage && (
-          <div className="text-center mb-6">
-            <p className="text-sm text-[var(--red)] bg-[var(--red)]/5 border border-[var(--red)]/15 rounded-lg px-4 py-2 inline-block">
-              {errorMessage}
-            </p>
-          </div>
-        )}
-
         {/* Cards */}
         <motion.div
           variants={containerVariants}
@@ -171,6 +134,7 @@ export function Pricing() {
                     }
               }
             >
+              {/* Top accent line for Pro */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -180,6 +144,7 @@ export function Pricing() {
                 />
               )}
 
+              {/* Badge */}
               {plan.badge && (
                 <div className="flex justify-center">
                   <span
@@ -194,6 +159,7 @@ export function Pricing() {
                 </div>
               )}
 
+              {/* Plan name + description */}
               <div>
                 <p
                   className="text-lg font-semibold tracking-tight mb-1"
@@ -208,6 +174,7 @@ export function Pricing() {
                   {plan.description}
                 </p>
 
+                {/* Price */}
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
@@ -224,11 +191,13 @@ export function Pricing() {
                 </div>
               </div>
 
+              {/* Divider */}
               <div
                 className="h-px w-full"
                 style={{ backgroundColor: 'var(--border)' }}
               />
 
+              {/* Features */}
               <ul className="flex flex-col gap-3 flex-1">
                 {plan.features.map((feature, j) => (
                   <li
@@ -258,9 +227,8 @@ export function Pricing() {
                 ))}
               </ul>
 
+              {/* CTA */}
               <button
-                onClick={() => handleCheckout(plan.name.toLowerCase())}
-                disabled={loadingPlan !== null}
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={
                   plan.highlighted
@@ -301,17 +269,7 @@ export function Pricing() {
                   }
                 }}
               >
-                {loadingPlan === plan.name.toLowerCase() ? (
-                  <>
-                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    <span>Redirection...</span>
-                  </>
-                ) : (
-                  <span>{plan.cta}</span>
-                )}
+                {plan.cta}
               </button>
             </motion.div>
           ))}

@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,18 +18,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-interface SignupFormProps {
-  pendingSessionId?: string | null
-}
-
-export function SignupForm({ pendingSessionId }: SignupFormProps) {
+export function SignupForm() {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading' || state.status === 'linking'
+  const isLoading = state.status === 'loading'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -92,25 +88,6 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
-    }
-
-    // Si on a un pendingSessionId, lier la session Stripe avant redirection
-    if (pendingSessionId) {
-      setState({ status: 'linking' })
-      try {
-        const res = await fetch('/api/stripe/link-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ sessionId: pendingSessionId }),
-        })
-        if (!res.ok) {
-          console.error('Failed to link Stripe session:', res.status)
-          // On redirige quand même — le webhook aura lié la session plus tard
-        }
-      } catch (err) {
-        console.error('Link session error:', err)
-        // On redirige quand même — le webhook aura lié la session plus tard
-      }
     }
 
     router.push('/chat')
@@ -208,13 +185,6 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         </p>
       )}
 
-      {/* Message de linkage Stripe */}
-      {state.status === 'linking' && (
-        <p className="text-sm text-center py-2 px-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700">
-          Configuration de votre abonnement...
-        </p>
-      )}
-
       {/* Bouton submit */}
       <button
         type="submit"
@@ -227,7 +197,7 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>{state.status === 'linking' ? 'Activation...' : 'Création en cours...'}</span>
+            <span>Création en cours...</span>
           </>
         ) : (
           <span>Créer un compte</span>
