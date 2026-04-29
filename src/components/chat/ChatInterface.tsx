@@ -6,12 +6,43 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { QuotaDisplay } from '@/components/subscription/QuotaDisplay'
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Quota state
+  const [quotaLoading, setQuotaLoading] = useState(true)
+  const [plan, setPlan] = useState<string | null>(null)
+  const [unitsUsed, setUnitsUsed] = useState(0)
+  const [unitsLimit, setUnitsLimit] = useState<number | null>(null)
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string>('free')
+
+  // Fetch quota on mount
+  useEffect(() => {
+    async function fetchQuota() {
+      try {
+        const res = await fetch('/api/subscription/quota', { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          setPlan(data.plan ?? null)
+          setUnitsUsed(data.units_used ?? 0)
+          setUnitsLimit(data.units_limit ?? null)
+          setRemaining(data.units_remaining ?? 0)
+          setSubscriptionStatus(data.status ?? 'free')
+        }
+      } catch {
+        // quota remains null/0 — keep UI neutral
+      } finally {
+        setQuotaLoading(false)
+      }
+    }
+    fetchQuota()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,13 +53,14 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
+  const atLimit = remaining !== null && remaining <= 0
+
+  async function handleSubmit(e?: FormEvent) {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,7 +70,6 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -49,8 +80,26 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      if (!atLimit) {
+        try {
+          const res = await fetch('/api/subscription/decrement', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ count: 1 }),
+            credentials: 'include',
+          })
+          if (res.ok) {
+            const data = await res.json()
+            setRemaining(data.units_remaining ?? null)
+            setUnitsUsed(data.units_used ?? unitsUsed + 1)
+          }
+        } catch {
+          // silent — quota decrement is best-effort
+        }
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +107,19 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Quota display — top bar */}
+      {!quotaLoading && (
+        <div className="shrink-0 mb-4 px-1">
+          <QuotaDisplay
+            plan={plan}
+            unitsUsed={unitsUsed}
+            unitsLimit={unitsLimit}
+            remaining={remaining}
+            status={subscriptionStatus}
+          />
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +164,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={atLimit ? undefined : undefined}
         />
       </div>
     </div>
