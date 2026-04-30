@@ -1,32 +1,56 @@
 'use client'
 
+import React from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    id: 'starter',
+    name: 'Starter',
+    price: '9 €',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour démarrer sans engagement.',
+    messages: 50,
     features: [
-      { text: '100 questions / mois', included: true },
+      { text: '50 messages / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Starter',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    id: 'growth',
+    name: 'Growth',
+    price: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui veulent plus.',
+    messages: 200,
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '200 messages / mois', included: true },
+      { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Growth',
+    highlighted: true,
+    badge: 'Populaire',
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '79 €',
+    period: 'mois',
+    description: 'Pour les power users sans limite.',
+    messages: 1000,
+    features: [
+      { text: '1 000 messages / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
@@ -34,8 +58,7 @@ const plans = [
       { text: 'Priorité de traitement', included: true },
     ],
     cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +76,31 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingKey, setLoadingKey] = React.useState<string | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function handleCheckout(planId: string) {
+    setLoadingKey(planId)
+    setError(null)
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -112,7 +160,7 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start"
         >
           {plans.map((plan, i) => (
             <motion.div
@@ -134,7 +182,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -229,7 +277,7 @@ export function Pricing() {
 
               {/* CTA */}
               <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                 style={
                   plan.highlighted
                     ? {
@@ -243,13 +291,15 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                onClick={() => handleCheckout(plan.id)}
+                disabled={loadingKey !== null}
                 onMouseEnter={(e) => {
-                  if (plan.highlighted) {
+                  if (plan.highlighted && loadingKey === null) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
                       'var(--accent-hi)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform =
                       'translateY(-1px)'
-                  } else {
+                  } else if (loadingKey === null) {
                     ;(e.currentTarget as HTMLButtonElement).style.borderColor =
                       'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.color =
@@ -269,11 +319,25 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingKey === plan.id ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin shrink-0" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Error message */}
+        {error && (
+          <p className="text-sm text-center text-[var(--red)] mt-4">
+            {error}
+          </p>
+        )}
       </div>
     </section>
   )

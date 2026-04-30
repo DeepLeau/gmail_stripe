@@ -73,22 +73,21 @@ NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 # 1. Go to https://dashboard.stripe.com/webhooks
 # 2. Click "Add endpoint"
 # 3. Enter your endpoint URL (e.g., https://yourdomain.com/api/stripe/webhook)
-# 4. Select "checkout.session.completed" and "customer.subscription.updated"
+# 4. Select the events you want to listen for
 # 5. Copy the webhook signing secret (starts with whsec_)
 STRIPE_WEBHOOK_SECRET=whsec_...
 
 # Stripe Price IDs
 # 1. Go to https://dashboard.stripe.com/products
-# 2. Create a monthly "Starter" product at €9, click on it > Pricing > copy the Price ID
-STRIPE_STARTER_PRICE_ID=price_...
-# 3. Create a monthly "Growth" product at €29, copy the Price ID
-STRIPE_GROWTH_PRICE_ID=price_...
-# 4. Create a monthly "Pro" product at €79, copy the Price ID
-STRIPE_PRO_PRICE_ID=price_...
+# 2. Click on your "Starter" product > Pricing tab > copy the Price ID
+STRIPE_PRICE_STARTER=price_...
+# 3. Click on your "Growth" product > Pricing tab > copy the Price ID
+STRIPE_PRICE_GROWTH=price_...
+# 4. Click on your "Pro" product > Pricing tab > copy the Price ID
+STRIPE_PRICE_PRO=price_...
 
 # App URL
-# For local development: http://localhost:3000
-# For production: your Vercel deployment URL
+# Use http://localhost:3000 for local development
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
@@ -98,33 +97,39 @@ NEXT_PUBLIC_BASE_URL=http://localhost:3000
 npm run dev
 ```
 
-Then open http://localhost:3000 in your browser.
+Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
-> 💡 **VS Code tip**: open the integrated terminal with `Ctrl+`` (or `Cmd+`` on Mac)
+> 💡 **VS Code tip**: open the integrated terminal with `` Ctrl+` `` (or `` Cmd+` `` on Mac)
 
 ## 🔑 Environment Variables
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > Project API keys > anon/public | Public API key for Supabase client |
-| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys > Secret key | Secret API key for Stripe server-side operations |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys > Publishable key | Public key for Stripe client-side |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks > select endpoint | Validates incoming webhook events |
-| `STRIPE_STARTER_PRICE_ID` | Yes | Stripe Dashboard > Products > Starter product > Pricing | Price ID for the €9/month Starter plan |
-| `STRIPE_GROWTH_PRICE_ID` | Yes | Stripe Dashboard > Products > Growth product > Pricing | Price ID for the €29/month Growth plan |
-| `STRIPE_PRO_PRICE_ID` | Yes | Stripe Dashboard > Products > Pro product > Pricing | Price ID for the €79/month Pro plan |
-| `NEXT_PUBLIC_BASE_URL` | Yes | Your deployment URL or `http://localhost:3000` for development | Base URL for Stripe redirects |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard → Project Settings → API → Project URL | Your Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard → Project Settings → API → anon/public key | Public API key for Supabase client |
+| `STRIPE_SECRET_KEY` | Yes | [Stripe Dashboard → API keys](https://dashboard.stripe.com/apikeys) | Secret API key for Stripe server operations |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | [Stripe Dashboard → API keys](https://dashboard.stripe.com/apikeys) | Publishable API key (starts with `pk_`) |
+| `STRIPE_WEBHOOK_SECRET` | Yes | [Stripe Dashboard → Webhooks](https://dashboard.stripe.com/webhooks) | Signing secret to verify webhook authenticity (starts with `whsec_`) |
+| `STRIPE_PRICE_STARTER` | Yes | Stripe Dashboard → Products → Starter → Pricing tab | Price ID for the Starter subscription plan |
+| `STRIPE_PRICE_GROWTH` | Yes | Stripe Dashboard → Products → Growth → Pricing tab | Price ID for the Growth subscription plan |
+| `STRIPE_PRICE_PRO` | Yes | Stripe Dashboard → Products → Pro → Pricing tab | Price ID for the Pro subscription plan |
+| `NEXT_PUBLIC_BASE_URL` | Yes | — | Your app's base URL (`http://localhost:3000` locally, production URL in production) |
 
 ## 📁 Project Structure
 
-- `src/app` — Next.js App Router pages and API routes (subscription, stripe endpoints, signup)
-- `src/components/auth` — Authentication components (SignupForm)
-- `src/components/chat` — Chat interface components (ChatInterface, ChatInput)
-- `src/components/sections` — Page section components (Pricing)
-- `src/components/subscription` — Subscription-related components (QuotaDisplay)
-- `src/components/ui` — Reusable UI components (UserMenu)
-- `src/lib/stripe` — Stripe integration utilities (client, config, hooks)
+- `src/app` — Next.js App Router pages and API routes
+- `src/app/api/stripe` — Stripe checkout and webhook API endpoints
+- `src/app/api/subscription` — Subscription management API
+- `src/app/signup` — User signup page
+- `src/app/chat` — AI chat interface page
+- `src/app/actions` — Server actions for subscription management
+- `src/components/auth` — Authentication components (signup form)
+- `src/components/chat` — Chat interface components
+- `src/components/ui` — Reusable UI components (user menu)
+- `src/components/sections` — Page section components (pricing)
+- `src/lib/stripe` — Stripe client configuration and hooks
+- `src/lib/supabase` — Supabase server client setup
+- `src/middleware.ts` — Next.js middleware for auth and routing
 
 ## 🚀 Deploy to Vercel
 
@@ -132,24 +137,20 @@ Then open http://localhost:3000 in your browser.
 
 ### Step by step:
 
-1. **Push your code to GitHub** — if you haven't already
-2. **Click the deploy button above** — or go to vercel.com/new
-3. **Import your repository** — select your `my-app` repo
-4. **Add environment variables** — go to Settings > Environment Variables and add all variables from your `.env.local`:
-
+1. **Import your repository** — Click the deploy button above, then select your GitHub repo
+2. **Add environment variables** — In the Vercel dashboard, go to your project → Settings → Environment Variables and add all variables from your `.env.local` file:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `STRIPE_SECRET_KEY`
    - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
    - `STRIPE_WEBHOOK_SECRET`
-   - `STRIPE_STARTER_PRICE_ID`
-   - `STRIPE_GROWTH_PRICE_ID`
-   - `STRIPE_PRO_PRICE_ID`
-   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel deployment URL, e.g., `https://your-app.vercel.app`)
+   - `STRIPE_PRICE_STARTER`
+   - `STRIPE_PRICE_GROWTH`
+   - `STRIPE_PRICE_PRO`
+   - `NEXT_PUBLIC_BASE_URL` (set to your production URL, e.g., `https://your-app.vercel.app`)
+3. **Deploy** — Click Deploy and wait for the build to complete
 
-5. **Deploy** — Vercel will automatically build and deploy your app
-
-> ⚠️ **Important**: After deployment, you must update your Stripe webhook endpoint URL to point to your production domain (e.g., `https://your-app.vercel.app/api/stripe/webhook`).
+> ⚠️ **Important**: After deploying, go to your Stripe Dashboard → Webhooks and add a new endpoint pointing to `https://your-production-url/api/stripe/webhook` with the same events you selected for local development.
 
 ## 📝 License
 

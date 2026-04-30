@@ -3,14 +3,23 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
+import { decrementUnits } from '@/app/actions/subscription'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan: string | null
+  remaining: number
+  limit: number
+}
+
+export function ChatInterface({ plan, remaining: initialRemaining, limit }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState(initialRemaining)
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -26,7 +35,7 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -38,9 +47,34 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API + quota decrement
     setIsLoading(true)
     try {
+      // Try to decrement quota first — if limit_reached, block the request
+      const quotaResult = await decrementUnits()
+
+      if (quotaResult.error === 'limit_reached') {
+        // Add a system message notifying the user
+        const systemMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'ai',
+          content: 'Vous avez atteint votre limite de messages pour ce mois.',
+          timestamp: Date.now(),
+        }
+        setMessages((prev) => [...prev, systemMsg])
+        setLimitReached(true)
+        setRemaining(0)
+        setIsLoading(false)
+        return
+      }
+
+      // Update remaining after successful decrement
+      if (quotaResult.remaining !== undefined && quotaResult.remaining !== null) {
+        setRemaining(quotaResult.remaining)
+        if (quotaResult.remaining === 0) setLimitReached(true)
+      }
+
+      // Call the mock API to get AI response
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -50,7 +84,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +92,32 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Limit reached warning banner */}
+      {limitReached && (
+        <div className="mb-4 px-4 py-3 rounded-lg border text-sm flex items-center justify-between gap-3"
+          style={{
+            backgroundColor: 'var(--orange-light, #fff7ed)',
+            borderColor: 'var(--orange-border, #fdba74)',
+            color: 'var(--orange-text, #c2410c)',
+          }}>
+          <div className="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="shrink-0">
+              <path d="M8 1.5L14.5 13H1.5L8 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/>
+              <path d="M8 6v3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+              <circle cx="8" cy="10.5" r="0.6" fill="currentColor"/>
+            </svg>
+            <span>Limite de messages atteinte pour ce mois.</span>
+          </div>
+          <a
+            href="/#pricing"
+            className="text-xs font-semibold underline underline-offset-2 shrink-0"
+            style={{ color: 'inherit' }}
+          >
+            Passer à un plan supérieur →
+          </a>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +162,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={() => setLimitReached(true)}
         />
       </div>
     </div>
