@@ -2,16 +2,52 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+
+interface SubscriptionState {
+  remaining: number | null
+  plan: string | null
+  units_limit: number | null
+  units_used: number | null
+  status: string | null
+}
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionState>({
+    remaining: null,
+    plan: null,
+    units_limit: null,
+    units_used: null,
+    status: null,
+  })
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription on mount
+  useEffect(() => {
+    async function fetchSubscription() {
+      try {
+        const res = await fetch('/api/user/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setSubscription({
+            remaining: data.units_remaining,
+            plan: data.plan,
+            units_limit: data.units_limit,
+            units_used: data.units_used,
+            status: data.status,
+          })
+        }
+      } catch {
+        // non-blocking — subscription will remain null
+      }
+    }
+    fetchSubscription()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -21,6 +57,10 @@ export function ChatInterface() {
       })
     }
   }, [messages.length])
+
+  const handleLimitReached = () => {
+    // ChatInput shows the banner internally via the isAtLimit state
+  }
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -38,19 +78,64 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API réel
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      })
+
+      if (res.status === 429) {
+        // Limit reached — trigger banner via onLimitReached
+        handleLimitReached()
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'ai',
+          content:
+            "Vous avez atteint votre limite de messages pour ce mois. Passez à un plan supérieur pour continuer.",
+          timestamp: Date.now(),
+        }
+        setMessages((prev) => [...prev, aiMessage])
+        return
+      }
+
+      if (!res.ok) {
+        throw new Error('Erreur lors de la réponse')
+      }
+
+      const data = await res.json()
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: data.content ?? data.response ?? '',
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Refresh subscription to get updated quota
+      try {
+        const subRes = await fetch('/api/user/subscription', { cache: 'no-store' })
+        if (subRes.ok) {
+          const subData = await subRes.json()
+          setSubscription((prev) => ({
+            ...prev,
+            remaining: subData.units_remaining,
+            units_used: subData.units_used,
+          }))
+        }
+      } catch {
+        // non-blocking
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      const errorMessage: ChatMessage = {
+        id: crypto.randomUUID(),
+        role: 'ai',
+        content: "Une erreur est survenue. Veuillez réessayer.",
+        timestamp: Date.now(),
+      }
+      setMessages((prev) => [...prev, errorMessage])
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +187,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={subscription.remaining}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>
