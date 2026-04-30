@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
+import { createClient } from '@/lib/supabase/client'
 
 type UserMenuProps = {
   userEmail: string
@@ -15,16 +16,51 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
+interface SubData {
+  units_used: number
+  units_limit: number
+  plan: string | null
+}
+
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
+  const [subData, setSubData] = useState<SubData | null>(null)
+  const [loadingSub, setLoadingSub] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
+  // Initiales
   const initials = userEmail.slice(0, 2).toUpperCase()
 
   // Badge style
   const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+
+  // Load subscription data when menu opens
+  useEffect(() => {
+    if (!open) return
+
+    async function loadSubData() {
+      const supabase = createClient()
+      if (!supabase) return
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      setLoadingSub(true)
+      const { data } = await supabase
+        .from('user_subscriptions')
+        .select('units_used, units_limit, plan')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      setSubData(data)
+      setLoadingSub(false)
+    }
+
+    void loadSubData()
+  }, [open])
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -57,6 +93,17 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
     }
   }
 
+  // Compute remaining
+  const remaining =
+    subData && subData.units_limit > 0 ? subData.units_limit - subData.units_used : null
+
+  // Only show counter if: has a paid plan, limit is set, plan is not free
+  const showCounter =
+    plan != null &&
+    plan.toLowerCase() !== 'free' &&
+    subData != null &&
+    subData.units_limit > 0
+
   return (
     <div ref={ref} className="relative">
       {/* Trigger : avatar rond */}
@@ -84,11 +131,32 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
             <div className="flex items-center gap-2">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
               {badgeStyle && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}
+                >
                   {badgeStyle.label}
                 </span>
               )}
             </div>
+
+            {/* Messages restants */}
+            {showCounter && (
+              <div className="mt-2 pt-2 border-t border-[var(--border)]">
+                {loadingSub ? (
+                  <div className="flex items-center gap-1.5">
+                    <Loader2 size={10} className="animate-spin text-[var(--text-3)]" />
+                    <p className="text-[11px] text-[var(--text-3)]">Chargement…</p>
+                  </div>
+                ) : remaining !== null ? (
+                  <p className="text-[11px] text-[var(--text-3)]">
+                    <span className="font-medium text-[var(--text-2)] tabular-nums">
+                      {remaining.toLocaleString('fr-FR')}
+                    </span>{' '}
+                    messages restants ce mois
+                  </p>
+                ) : null}
+              </div>
+            )}
           </div>
 
           {/* Bouton déconnexion */}
@@ -103,7 +171,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
             {loggingOut ? (
               <>
                 <Loader2 size={14} className="animate-spin shrink-0" />
-                <span>Déconnexion...</span>
+                <span>Déconnexion…</span>
               </>
             ) : (
               <>
