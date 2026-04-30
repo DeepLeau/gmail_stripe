@@ -2,16 +2,24 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendChatMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription?: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const remaining = subscription?.units_remaining ?? null
+  const isLimitReached = remaining === 0
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -28,6 +36,8 @@ export function ChatInterface() {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
+    if (isLimitReached) return
+
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -41,15 +51,15 @@ export function ChatInterface() {
     // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const data = await sendChatMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: data.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
+    } catch (err) {
       // Erreur silencieuse — could add error state here
     } finally {
       setIsLoading(false)
@@ -58,6 +68,35 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Bannière quota atteint */}
+      {isLimitReached && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-center gap-3">
+          <div className="shrink-0 w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
+            <svg
+              className="w-4 h-4 text-amber-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+              />
+            </svg>
+          </div>
+          <div>
+            <p className="text-sm font-medium text-amber-800">
+              Limite de messages atteinte
+            </p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Mettez à jour votre plan pour continuer à poser des questions.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +141,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>

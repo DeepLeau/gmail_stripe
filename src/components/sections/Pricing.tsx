@@ -1,43 +1,9 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
-
-const plans = [
-  {
-    name: 'Free',
-    price: '0 €',
-    period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
-    features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
-      { text: 'Priorité de traitement', included: false },
-    ],
-    cta: 'Commencer gratuitement',
-    highlighted: false,
-  },
-  {
-    name: 'Pro',
-    price: '19 €',
-    period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
-    features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: true },
-      { text: 'Priorité de traitement', included: true },
-    ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
-  },
-]
+import { plans } from '@/lib/data'
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -53,6 +19,31 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingKey, setLoadingKey] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCheckout(planId: string) {
+    setLoadingKey(planId)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +93,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Growth ou Pro quand tu ne peux plus t'en passer.
           </motion.p>
         </div>
 
@@ -112,15 +103,15 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.id}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
-                plan.highlighted
+                plan.popular
                   ? {
                       backgroundColor: 'var(--bg)',
                       border: '2px solid var(--accent)',
@@ -134,8 +125,8 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
-              {plan.highlighted && (
+              {/* Top accent line for popular */}
+              {plan.popular && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
                   style={{
@@ -145,7 +136,7 @@ export function Pricing() {
               )}
 
               {/* Badge */}
-              {plan.badge && (
+              {plan.popular && (
                 <div className="flex justify-center">
                   <span
                     className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
@@ -154,7 +145,7 @@ export function Pricing() {
                       color: '#fff',
                     }}
                   >
-                    {plan.badge}
+                    Populaire
                   </span>
                 </div>
               )}
@@ -178,24 +169,21 @@ export function Pricing() {
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
+                    style={{
+                      color: plan.popular ? 'var(--accent)' : 'var(--text)',
+                      letterSpacing: '-0.04em',
+                    }}
                   >
-                    {plan.price}
+                    {plan.price} €
                   </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
-                    / {plan.period}
+                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>
+                    / mois
                   </span>
                 </div>
               </div>
 
               {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
+              <div className="h-px w-full" style={{ backgroundColor: 'var(--border)' }} />
 
               {/* Features */}
               <ul className="flex flex-col gap-3 flex-1">
@@ -203,35 +191,31 @@ export function Pricing() {
                   <li
                     key={j}
                     className="flex items-start gap-3 text-sm"
-                    style={{
-                      color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
-                    }}
+                    style={{ color: 'var(--text-2)' }}
                   >
-                    {feature.included ? (
-                      <Check
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--accent)' }}
-                      />
-                    ) : (
-                      <X
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--text-3)' }}
-                      />
-                    )}
-                    {feature.text}
+                    <Check
+                      size={16}
+                      className="mt-0.5 flex-shrink-0"
+                      strokeWidth={2}
+                      style={{ color: 'var(--accent)' }}
+                    />
+                    {feature}
                   </li>
                 ))}
+                {/* Non-included placeholder for alignment across columns */}
+                {!plan.popular && (
+                  <li className="flex items-start gap-3 text-sm" style={{ color: 'var(--text-3)' }}>
+                    <X size={16} className="mt-0.5 flex-shrink-0" strokeWidth={2} />
+                    Multi-comptes
+                  </li>
+                )}
               </ul>
 
               {/* CTA */}
               <button
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={
-                  plan.highlighted
+                  plan.popular
                     ? {
                         backgroundColor: 'var(--accent)',
                         color: '#fff',
@@ -243,37 +227,43 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                disabled={loadingKey === plan.id}
+                onClick={() => handleCheckout(plan.id)}
                 onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
+                  if (plan.popular) {
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-hi)'
+                    ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
+                  if (plan.popular) {
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform = ''
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-md)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
                   }
                 }}
               >
-                {plan.cta}
+                {loadingKey === plan.id ? (
+                  <span className="animate-pulse">Redirection...</span>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Error message */}
+        {error && (
+          <p className="mt-4 text-sm text-center text-[var(--red)]">
+            {error}
+          </p>
+        )}
       </div>
     </section>
   )
