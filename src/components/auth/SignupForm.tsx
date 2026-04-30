@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,7 +19,11 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  stripeSessionId?: string
+}
+
+export function SignupForm({ stripeSessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -77,7 +82,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -88,6 +93,16 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Link Stripe Checkout session to the freshly created user
+    if (stripeSessionId && data.user) {
+      try {
+        await linkStripeSessionToUser(stripeSessionId)
+      } catch (linkErr) {
+        // Log but do not block — subscription can be linked via webhook or retry
+        console.error('[SignupForm] Failed to link Stripe session:', linkErr)
+      }
     }
 
     router.push('/chat')
