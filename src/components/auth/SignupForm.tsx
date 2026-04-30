@@ -1,12 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/stripe'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'signing_up' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -20,12 +21,15 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id')
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'signing_up' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -77,6 +81,8 @@ export function SignupForm() {
       return
     }
 
+    setState({ status: 'signing_up' })
+
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
@@ -88,6 +94,22 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // If a Stripe session is pending, link it now
+    if (sessionId) {
+      setState({ status: 'linking', errorMessage: undefined })
+
+      const linkResult = await linkStripeSessionToUser(sessionId)
+
+      if (!linkResult.ok && linkResult.error !== 'session_not_found') {
+        // Non-blocking: warn but don't block signup completion
+        console.warn('[SignupForm] Stripe linking failed:', linkResult.error)
+        setState({ status: 'idle', errorMessage: 'Compte créé — le plan devra être activé manuellement' })
+        // Still redirect after short delay so user isn't stuck
+        setTimeout(() => router.push('/chat'), 2500)
+        return
+      }
     }
 
     router.push('/chat')
@@ -178,9 +200,16 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
+      {/* Message d'erreur global (non-field level, non-linking warning) */}
       {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+          {state.errorMessage}
+        </p>
+      )}
+
+      {/* Message de lien Stripe échoué (non-bloquant) */}
+      {state.status === 'idle' && state.errorMessage && !state.fieldErrors && (
+        <p className="text-sm text-[var(--amber)] text-center py-2 px-3 rounded-lg bg-[var(--amber)]/5 border border-[var(--amber)]/15">
           {state.errorMessage}
         </p>
       )}
@@ -197,7 +226,13 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {state.status === 'signing_up'
+                ? 'Création en cours...'
+                : state.status === 'linking'
+                ? 'Finalisation de votre inscription...'
+                : 'Chargement...'}
+            </span>
           </>
         ) : (
           <span>Créer un compte</span>

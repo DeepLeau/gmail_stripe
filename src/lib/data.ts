@@ -40,6 +40,15 @@ export type FooterLink = {
 }
 
 // ============================================================
+// Shared utility functions
+// ============================================================
+
+export function formatMessagesCount(n: number): string {
+  if (n === 1) return '1 message'
+  return `${n} messages`
+}
+
+// ============================================================
 // Question pairs — section "Exemples de questions"
 // ============================================================
 

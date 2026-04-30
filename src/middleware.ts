@@ -4,6 +4,11 @@ import { NextResponse, type NextRequest } from 'next/server'
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Webhook routes must bypass auth — Stripe cannot send session cookies
+  if (pathname.startsWith('/api/stripe/webhook')) {
+    return NextResponse.next({ request })
+  }
+
   const PROTECTED_PREFIXES = ['/chat']
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
 
