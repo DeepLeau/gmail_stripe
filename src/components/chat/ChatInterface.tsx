@@ -7,11 +7,21 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining?: number
+}
+
+export function ChatInterface({ remaining }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remainingState, setRemainingState] = useState<number | undefined>(remaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Sync prop to state on mount/update
+  useEffect(() => {
+    setRemainingState(remaining)
+  }, [remaining])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -24,6 +34,11 @@ export function ChatInterface() {
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
+
+    // Check quota before sending
+    if (remainingState !== undefined && remainingState <= 0) {
+      return
+    }
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
@@ -49,6 +64,16 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Decrement quota if active
+      if (remainingState !== undefined && remainingState > 0) {
+        try {
+          await fetch('/api/subscriptions/increment-usage', { method: 'POST' })
+          setRemainingState((prev) => (prev !== undefined ? prev - 1 : prev))
+        } catch {
+          // Non-blocking - quota tracking is best-effort
+        }
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -102,6 +127,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remainingState}
         />
       </div>
     </div>
