@@ -3,10 +3,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
+import { formatMessagesCount } from '@/lib/data'
 
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
+  remaining?: number | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -15,7 +17,7 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, remaining }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -25,6 +27,10 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
 
   // Badge style
   const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+
+  // Show remaining count for paid plans
+  const isPaidPlan = plan !== null && plan !== 'free'
+  const showRemaining = remaining !== null && remaining !== undefined && isPaidPlan
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -78,7 +84,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
+          {/* Email + Plan badge + remaining count */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
@@ -89,6 +95,11 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                 </span>
               )}
             </div>
+            {showRemaining && (
+              <p className="text-xs text-[var(--text-3)] mt-1">
+                {formatMessagesCount(remaining!)} restants
+              </p>
+            )}
           </div>
 
           {/* Bouton déconnexion */}

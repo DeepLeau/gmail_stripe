@@ -1,17 +1,33 @@
 'use client'
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { createClient } from '@/lib/supabase/client'
+import Link from 'next/link'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  userId?: string
+  plan?: string | null
+  remaining?: number | null
+}
+
+export function ChatInterface({ userId, plan, remaining: initialRemaining }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState<number | null>(initialRemaining ?? null)
+  const [showLimitBanner, setShowLimitBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const isAtLimit = remaining !== null && remaining <= 0
+
+  useEffect(() => {
+    setShowLimitBanner(isAtLimit)
+  }, [isAtLimit])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,13 +38,19 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
-    // Ajout du message utilisateur
+    // Check quota via RPC before sending
+    if (remaining !== null && remaining <= 0) {
+      setShowLimitBanner(true)
+      return
+    }
+
+    // Add user message
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,7 +60,24 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Decrement quota via RPC
+    if (remaining !== null) {
+      const supabase = createClient()
+      if (supabase) {
+        const { data: decResult } = await supabase.rpc('decrement_units')
+        if (decResult) {
+          const parsed = typeof decResult === 'string' ? JSON.parse(decResult) : decResult
+          if (parsed && typeof parsed.remaining === 'number') {
+            setRemaining(parsed.remaining)
+            if (parsed.remaining <= 0) {
+              setShowLimitBanner(true)
+            }
+          }
+        }
+      }
+    }
+
+    // Call API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -50,7 +89,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +97,21 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Banner: limit reached */}
+      {showLimitBanner && (
+        <div className="mb-4 flex items-center gap-3 px-4 py-3 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-sm text-red-600 font-medium flex-1">
+            Vous avez atteint votre limite — passez à un plan supérieur
+          </p>
+          <Link
+            href="/#pricing"
+            className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline shrink-0"
+          >
+            Voir les plans
+          </Link>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -100,8 +154,10 @@ export function ChatInterface() {
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
-          onSubmit={() => handleSubmit()}
+          onSubmit={handleSubmit}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={() => setShowLimitBanner(true)}
         />
       </div>
     </div>
