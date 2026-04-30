@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
@@ -18,8 +19,15 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  pendingSessionId?: string
+}
+
+export function SignupForm({ pendingSessionId }: SignupFormProps) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = pendingSessionId ?? searchParams.get('session_id') ?? undefined
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -31,7 +39,7 @@ export function SignupForm() {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -88,6 +96,20 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Link Stripe session if present — non-blocking
+    if (sessionId) {
+      try {
+        await fetch('/api/stripe/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId, email: email.trim() }),
+        })
+      } catch (err) {
+        // Log but don't block — account was created successfully
+        console.error('[SignupForm] Stripe link failed:', err)
+      }
     }
 
     router.push('/chat')
