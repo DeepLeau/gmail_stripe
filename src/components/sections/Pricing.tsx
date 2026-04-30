@@ -1,41 +1,64 @@
 'use client'
 
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Zap } from 'lucide-react'
 
+// Plans Stripe canoniques — ces données doivent correspondre à STRIPE_PLANS dans lib/stripe/config.ts
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    id: 'starter',
+    name: 'Starter',
+    price: '9',
+    priceLabel: '9 €',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour découvrir Emind et automiser tes réponses email.',
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
+      { text: '50 questions / mois', included: true },
+      { text: '1 boîte email connectée', included: true },
+      { text: 'Réponses en 10 secondes', included: true },
+      { text: 'Support par email', included: true },
+      { text: 'Boîtes email illimitées', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Starter',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    id: 'growth',
+    name: 'Growth',
+    price: '29',
+    priceLabel: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
     features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
+      { text: '200 questions / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Réponses en 5 secondes', included: true },
+      { text: 'Support prioritaire', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Growth',
+    highlighted: true,
+    badge: 'Populaire',
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '79',
+    priceLabel: '79 €',
+    period: 'mois',
+    description: 'Pour les power users et équipes qui ne peuvent plus se permettre de rater un email.',
+    features: [
+      { text: '1 000 questions / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Réponses en 3 secondes', included: true },
+      { text: 'Support dédié', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
     cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    highlighted: false,
   },
 ]
 
@@ -53,13 +76,35 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  async function handleCheckout(planId: string) {
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId }),
+      })
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+
+      const { url } = await res.json()
+      if (url) {
+        window.location.href = url
+      }
+    } catch (err) {
+      console.error('[Pricing] Checkout error:', err)
+    }
+  }
+
   return (
     <section
       id="pricing"
       className="py-24 px-6"
       style={{ backgroundColor: 'var(--surface)' }}
     >
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         {/* Header */}
         <div className="text-center mb-14">
           <motion.div
@@ -102,7 +147,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe au plan supérieur quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,7 +157,7 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
           {plans.map((plan, i) => (
             <motion.div
@@ -134,7 +179,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -154,6 +199,7 @@ export function Pricing() {
                       color: '#fff',
                     }}
                   >
+                    <Zap size={10} className="mr-1 mt-[1px]" />
                     {plan.badge}
                   </span>
                 </div>
@@ -178,9 +224,12 @@ export function Pricing() {
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
+                    style={{
+                      color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                      letterSpacing: '-0.04em',
+                    }}
                   >
-                    {plan.price}
+                    {plan.priceLabel}
                   </span>
                   <span
                     className="text-sm"
@@ -243,29 +292,23 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                onClick={() => handleCheckout(plan.id)}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-hi)'
+                    ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform = ''
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-md)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
                   }
                 }}
               >
@@ -274,6 +317,18 @@ export function Pricing() {
             </motion.div>
           ))}
         </motion.div>
+
+        {/* Footer note */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          whileInView={{ opacity: 1 }}
+          viewport={{ once: true }}
+          transition={{ delay: 0.3 }}
+          className="text-center text-xs mt-8"
+          style={{ color: 'var(--text-3)' }}
+        >
+          Paiement sécurisé via Stripe. Annule à tout moment.
+        </motion.p>
       </div>
     </section>
   )
