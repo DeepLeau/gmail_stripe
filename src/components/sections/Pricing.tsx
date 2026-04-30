@@ -1,41 +1,68 @@
 'use client'
 
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { useState } from 'react'
 
+// Plans data aligned with Stripe canonical plans
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: 'Starter',
+    price: '9',
+    priceCents: 900,
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour découvrir Emind et automatiser vos réponses email.',
+    planKey: 'starter',
+    limit: 50,
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
+      { text: '50 messages / mois', included: true },
+      { text: '1 boîte email connectée', included: true },
+      { text: 'Réponses en 10 secondes', included: true },
+      { text: 'Support par email', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Starter',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    name: 'Growth',
+    price: '29',
+    priceCents: 2900,
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
+    planKey: 'growth',
+    limit: 200,
     features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
+      { text: '200 messages / mois', included: true },
+      { text: 'Plusieurs boîtes email', included: true },
+      { text: 'Réponses en 5 secondes', included: true },
+      { text: 'Support prioritaire', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Growth',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    name: 'Pro',
+    price: '79',
+    priceCents: 7900,
+    period: 'mois',
+    description: 'Pour les entreprises qui exigent le meilleur.',
+    planKey: 'pro',
+    limit: 1000,
+    features: [
+      { text: '1 000 messages / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Réponses en 3 secondes', included: true },
+      { text: 'Support prioritaire', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
     cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +80,35 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingKey, setLoadingKey] = useState<string | null>(null)
+  const [errorKey, setErrorKey] = useState<string | null>(null)
+
+  async function handleCheckout(planKey: string) {
+    setLoadingKey(planKey)
+    setErrorKey(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (err) {
+      setErrorKey(planKey)
+      const message = err instanceof Error ? err.message : 'Une erreur est survenue'
+      alert(message)
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +158,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Growth ou Pro quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,11 +168,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.planKey}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +190,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -150,7 +206,7 @@ export function Pricing() {
                   <span
                     className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
                     style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                      background: 'linear-gradient(135deg, var(--accent), var(--violet))',
                       color: '#fff',
                     }}
                   >
@@ -175,7 +231,7 @@ export function Pricing() {
                 </p>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
+                <div className="flex items-baseline gap-1.5 mb-1">
                   <span
                     className="text-4xl font-bold tracking-tight"
                     style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
@@ -186,9 +242,20 @@ export function Pricing() {
                     className="text-sm"
                     style={{ color: 'var(--text-3)' }}
                   >
+                    €
+                  </span>
+                  <span
+                    className="text-sm"
+                    style={{ color: 'var(--text-3)' }}
+                  >
                     / {plan.period}
                   </span>
                 </div>
+
+                {/* Messages limit */}
+                <p className="text-xs" style={{ color: 'var(--text-3)' }}>
+                  {plan.limit.toLocaleString('fr-FR')} messages / mois
+                </p>
               </div>
 
               {/* Divider */}
@@ -243,6 +310,8 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                disabled={loadingKey === plan.planKey}
+                onClick={() => handleCheckout(plan.planKey)}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -269,7 +338,14 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingKey === plan.planKey ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin shrink-0" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}

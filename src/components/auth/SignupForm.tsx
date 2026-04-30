@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch' | 'linked'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,20 +18,24 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string | null
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -85,9 +89,32 @@ export function SignupForm() {
     if (error) {
       const message = error.message === 'User already registered'
         ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
+        : "Une erreur est survenue lors de la création du compte"
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Si une session Stripe est présente, essayer de la lier
+    if (sessionId) {
+      setState({ status: 'linking' })
+      try {
+        const linkRes = await fetch('/api/stripe/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+
+        if (linkRes.ok) {
+          setState({ status: 'linked' })
+          // Small delay so user sees the success message before redirect
+          await new Promise((resolve) => setTimeout(resolve, 1500))
+          router.push('/chat')
+          return
+        }
+        // Linking failed — still allow redirect (non-blocking)
+      } catch {
+        // Linking failed — still allow redirect (non-blocking)
+      }
     }
 
     router.push('/chat')
@@ -95,6 +122,16 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Message de succès (abonnement activé) */}
+      {state.status === 'linked' && (
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+          <CheckCircle size={16} className="text-green-600 shrink-0" />
+          <p className="text-sm text-green-700 font-medium">
+            Votre abonnement a été activé !
+          </p>
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -194,10 +231,15 @@ export function SignupForm() {
                    text-sm font-medium transition-colors duration-150
                    disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
-        {isLoading ? (
+        {state.status === 'loading' ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : state.status === 'linking' ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Activation de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>

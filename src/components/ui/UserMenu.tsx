@@ -7,6 +7,8 @@ import { logoutAction } from '@/app/actions/auth'
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
+  remaining?: number | null
+  unitsLimit?: number | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -15,7 +17,14 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+function formatQuota(remaining: number): string {
+  if (remaining === 1) {
+    return '1 message restant ce mois'
+  }
+  return `${remaining} messages restants ce mois`
+}
+
+export function UserMenu({ userEmail, plan, remaining, unitsLimit }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -90,6 +99,17 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
               )}
             </div>
           </div>
+
+          {/* Quota info */}
+          {remaining !== null && remaining !== undefined && (
+            <div className="px-3 py-2.5 border-b border-[var(--border)]">
+              <p className="text-xs" style={{ color: remaining === 0 ? 'var(--red)' : 'var(--text-3)' }}>
+                {remaining === 0
+                  ? 'Aucun message restant ce mois'
+                  : formatQuota(remaining)}
+              </p>
+            </div>
+          )}
 
           {/* Bouton déconnexion */}
           <button
