@@ -156,33 +156,76 @@ export const trustItems: TrustItem[] = [
 // Plans — section "Tarification"
 // ============================================================
 
-export const plans: Plan[] = [
+export interface PlanConfig {
+  id: string
+  slug: string
+  name: string
+  description: string
+  price: number
+  priceCents: number
+  features: string[]
+  popular: boolean
+  cta: string
+  limit: number
+  unit: string
+}
+
+export const plans: PlanConfig[] = [
   {
-    name: "Free",
-    price: "0",
-    description: "Pour découvrir Emind et automiser vos réponses email.",
+    id: 'starter',
+    slug: 'starter',
+    name: 'Starter',
+    description: 'Pour découvrir Emind et automatiser vos réponses email.',
+    price: 9,
+    priceCents: 900,
     features: [
-      "100 questions/mois",
-      "1 boîte email connectée",
-      "Réponses en 10 secondes",
-      "Support par email",
+      '50 messages / mois',
+      '1 boîte email connectée',
+      'Réponses en 10 secondes',
+      'Support par email',
     ],
-    cta: "Commencer gratuitement",
-    highlighted: false,
+    popular: false,
+    cta: 'Commencer gratuitement',
+    limit: 50,
+    unit: 'messages',
   },
   {
-    name: "Pro",
-    price: "29",
-    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
+    id: 'growth',
+    slug: 'growth',
+    name: 'Growth',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
+    price: 29,
+    priceCents: 2900,
     features: [
-      "Questions illimitées",
-      "Boîtes email illimitées",
-      "Priorité de traitement",
-      "Réponses en 3 secondes",
-      "Support prioritaire",
+      '200 messages / mois',
+      'Boîtes email illimitées',
+      'Priorité de traitement',
+      'Réponses en 5 secondes',
+      'Support prioritaire',
     ],
-    cta: "Passer Pro",
-    highlighted: true,
+    popular: true,
+    cta: 'Passer à Growth',
+    limit: 200,
+    unit: 'messages',
+  },
+  {
+    id: 'pro',
+    slug: 'pro',
+    name: 'Pro',
+    description: 'Pour les équipes qui veulent maîtriser leur temps.',
+    price: 79,
+    priceCents: 7900,
+    features: [
+      '1 000 messages / mois',
+      'Boîtes email illimitées',
+      'Traitement ultra-rapide',
+      'Multi-comptes',
+      'Support dédié',
+    ],
+    popular: false,
+    cta: 'Passer à Pro',
+    limit: 1000,
+    unit: 'messages',
   },
 ]
 
