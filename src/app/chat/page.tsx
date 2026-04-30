@@ -1,6 +1,42 @@
+import { redirect } from 'next/navigation'
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { createClient } from '@/lib/supabase/server'
 
-export default function ChatPage() {
+export default async function ChatPage() {
+  let supabase
+  try {
+    supabase = await createClient()
+  } catch {
+    // Env vars manquantes (build time ou configuration invalide)
+    redirect('/login')
+  }
+
+  if (!supabase) {
+    redirect('/login')
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  // Fetch subscription data
+  const res = await fetch(`${process.env.NEXT_PUBLIC_SITE_URL ?? ''}/api/subscription`, {
+    cache: 'no-store',
+  })
+
+  let remaining: number | null = null
+  let plan: string | null = null
+
+  if (res.ok) {
+    const data = await res.json()
+    remaining = data.units_remaining
+    plan = data.plan
+  }
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -13,7 +49,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface remaining={remaining} plan={plan} />
         </div>
       </div>
     </main>

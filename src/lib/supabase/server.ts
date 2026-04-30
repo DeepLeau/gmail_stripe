@@ -2,8 +2,10 @@
  * Supabase Server Client
  * Used in Server Components, Server Actions, and Route Handlers.
  *
- * Pattern lazy : throw si les env vars sont manquantes côté serveur —
- * jamais continuer silencieusement sans Supabase.
+ * Pattern lazy + defensive : retourne null si les env vars ne sont pas là,
+ * au lieu de thrower. Permet au build de prerenderer sans crasher quand
+ * les variables ne sont pas définies (build time). Le composant appelant
+ * doit gérer le cas null.
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
@@ -13,10 +15,8 @@ export async function createClient() {
   const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      'Missing Supabase environment variables. ' +
-        'Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your .env file.'
-    )
+    // Retourne null plutôt que thrower — le consumer gère le cas.
+    return null
   }
 
   const cookieStore = await cookies()

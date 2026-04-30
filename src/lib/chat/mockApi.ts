@@ -54,10 +54,11 @@ export interface ChatResponse {
 /**
  * API-compatible chat message sender.
  * Calls the real /api/chat/send endpoint.
- * 
+ *
  * @param content - The user's message content
  * @param _userId - User ID (kept for API compatibility, not used in mock)
  * @returns Promise resolving to ChatResponse with AI text and units_used
+ * @throws Error with message 'limit_reached' when quota is exhausted
  */
 export async function sendChatMessage(
   content: string,
@@ -80,4 +81,19 @@ export async function sendChatMessage(
   }
 
   return response.json()
+}
+
+/**
+ * Fetches the current remaining units for the authenticated user.
+ * @returns Promise resolving to remaining units count, or null if not authenticated
+ */
+export async function getRemaining(): Promise<number | null> {
+  try {
+    const res = await fetch('/api/subscription', { cache: 'no-store' })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.units_remaining ?? null
+  } catch {
+    return null
+  }
 }

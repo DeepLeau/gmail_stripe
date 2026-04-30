@@ -18,7 +18,11 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  pendingCheckoutToken?: string
+}
+
+export function SignupForm({ pendingCheckoutToken }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -31,7 +35,7 @@ export function SignupForm() {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -77,7 +81,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -88,6 +92,36 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Si un pendingCheckoutToken est présent, lier la session Stripe
+    if (pendingCheckoutToken && data.user) {
+      try {
+        const linkRes = await fetch('/api/subscription/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            session_id: pendingCheckoutToken,
+            user_id: data.user.id,
+          }),
+        })
+
+        if (!linkRes.ok) {
+          // Échec de liaison — non bloquant, l'utilisateur est inscrit
+          setState({
+            status: 'error',
+            errorMessage: 'Votre compte a été créé. La liaison avec votre abonnement a échoué. Veuillez contacter le support.',
+          })
+          return
+        }
+      } catch {
+        // Échec de liaison — non bloquant
+        setState({
+          status: 'error',
+          errorMessage: 'Votre compte a été créé. La liaison avec votre abonnement a échoué. Veuillez contacter le support.',
+        })
+        return
+      }
     }
 
     router.push('/chat')
