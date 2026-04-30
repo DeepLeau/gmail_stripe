@@ -4,9 +4,15 @@ import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
 
+interface SubscriptionInfo {
+  plan: string | null
+  units_used: number
+  units_limit: number | null
+}
+
 type UserMenuProps = {
   userEmail: string
-  plan?: string | null
+  subscription?: SubscriptionInfo | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -15,18 +21,29 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, subscription }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
+  const plan = subscription?.plan ?? null
   const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
 
-  // Fermeture clic extérieur + Escape
+  const remaining =
+    subscription?.units_limit !== null && subscription?.units_limit !== undefined
+      ? Math.max(0, subscription.units_limit - (subscription?.units_used ?? 0))
+      : null
+
+  // Singular/pluriel pour les messages restants
+  const remainingLabel =
+    remaining !== null
+      ? remaining === 1
+        ? '1 message restant'
+        : `${remaining} messages restants`
+      : null
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -74,21 +91,32 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-50
-                        min-w-[220px] w-max
-                        bg-white border border-[var(--border-md)]
-                        rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
+        <div
+          className="absolute right-0 top-full mt-2 z-50
+                      min-w-[220px] w-max
+                      bg-white border border-[var(--border-md)]
+                      rounded-lg shadow-xl overflow-hidden py-1"
+        >
+          {/* Email + Plan badge + messages restants */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
-              <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
+              <p className="text-sm text-[var(--text)] font-medium truncate">
+                {userEmail}
+              </p>
               {badgeStyle && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}
+                >
                   {badgeStyle.label}
                 </span>
               )}
             </div>
+            {remainingLabel && (
+              <p className="text-xs text-[var(--text-3)] mt-1">
+                {remainingLabel}
+              </p>
+            )}
           </div>
 
           {/* Bouton déconnexion */}

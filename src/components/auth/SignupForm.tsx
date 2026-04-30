@@ -2,12 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CreditCard } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading_signup' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
+  linkingWarning?: string
   fieldErrors?: {
     email?: string
     password?: string
@@ -18,20 +19,25 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  pendingCheckoutSessionId?: string | null
+}
+
+export function SignupForm({ pendingCheckoutSessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading =
+    state.status === 'loading_signup' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -40,12 +46,6 @@ export function SignupForm() {
       fieldErrors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
       fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
     }
 
     if (!confirmPassword) {
@@ -69,7 +69,7 @@ export function SignupForm() {
 
     if (!validate()) return
 
-    setState({ status: 'loading' })
+    setState({ status: 'loading_signup' })
 
     const supabase = createClient()
     if (!supabase) {
@@ -77,132 +77,191 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data: authData, error: signUpError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
 
-    if (error) {
-      const message = error.message === 'User already registered'
+    if (signUpError) {
+      const message = signUpError.message === 'User already registered'
         ? 'Un compte existe déjà avec cet email'
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
     }
 
+    // If there's a pending checkout session to link, do it now
+    if (pendingCheckoutSessionId && authData.user) {
+      setState({ status: 'linking' })
+
+      try {
+        const linkRes = await fetch('/api/stripe/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: pendingCheckoutSessionId,
+            userId: authData.user.id,
+          }),
+        })
+
+        if (!linkRes.ok) {
+          // Non-blocking: warn but still let user go to /chat
+          const body = await linkRes.json().catch(() => ({}))
+          const warning =
+            body.error === 'checkout_not_found'
+              ? "La session de paiement n'a pas été trouvée. Rendez-vous sur la page Tarifs pour vous réabonner."
+              : "Problème de liaison avec votre achat. Vous pouvez continuer — contactez le support si votre abonnement n'apparaît pas."
+          setState({ status: 'idle', linkingWarning: warning })
+        }
+      } catch {
+        // Network error — non-blocking warning
+        setState({ status: 'idle', linkingWarning: 'Problème de connexion lors de la configuration de votre abonnement. Vous pouvez continuer — contactez le support si nécessaire.' })
+      }
+    }
+
     router.push('/chat')
   }
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
-      {/* Champ email */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
-          Adresse email
-        </label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
-          placeholder="vous@exemple.com"
-          className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
-                     bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
-                     focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     border-[var(--border-md)] focus:border-[var(--accent)]"
-        />
-        {state.status === 'error' && state.fieldErrors?.email && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.email}
+    <div className="flex flex-col gap-4">
+      {/* Banner si session Stripe en attente */}
+      {pendingCheckoutSessionId && (
+        <div className="flex items-start gap-3 p-3 rounded-lg bg-blue-50 border border-blue-100">
+          <CreditCard
+            size={16}
+            className="mt-0.5 shrink-0"
+            style={{ color: 'var(--accent)' }}
+          />
+          <p className="text-xs text-blue-700 leading-relaxed">
+            Tu as choisi un plan payant — ton compte sera prêt à l&apos;emploi à la création.
           </p>
-        )}
-      </div>
-
-      {/* Champ mot de passe */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="password" className="text-sm font-medium text-[var(--text-2)]">
-          Mot de passe
-        </label>
-        <input
-          id="password"
-          type="password"
-          autoComplete="new-password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
-          placeholder="Minimum 6 caractères"
-          className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
-                     bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
-                     focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     border-[var(--border-md)] focus:border-[var(--accent)]"
-        />
-        {state.status === 'error' && state.fieldErrors?.password && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.password}
-          </p>
-        )}
-      </div>
-
-      {/* Champ confirmation mot de passe */}
-      <div className="flex flex-col gap-1.5">
-        <label htmlFor="confirmPassword" className="text-sm font-medium text-[var(--text-2)]">
-          Confirmer le mot de passe
-        </label>
-        <input
-          id="confirmPassword"
-          type="password"
-          autoComplete="new-password"
-          value={confirmPassword}
-          onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
-          placeholder="••••••••"
-          className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
-                     bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
-                     focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
-                     disabled:opacity-50 disabled:cursor-not-allowed
-                     border-[var(--border-md)] focus:border-[var(--accent)]"
-        />
-        {state.status === 'error' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
-          </p>
-        )}
-        {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
-          </p>
-        )}
-      </div>
-
-      {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
-        </p>
+        </div>
       )}
 
-      {/* Bouton submit */}
-      <button
-        type="submit"
-        disabled={isLoading}
-        className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
-                   bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
-                   text-sm font-medium transition-colors duration-150
-                   disabled:opacity-60 disabled:cursor-not-allowed mt-1"
-      >
-        {isLoading ? (
-          <>
-            <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
-          </>
-        ) : (
-          <span>Créer un compte</span>
+      {/* Warning non-bloquant après linkage raté */}
+      {state.linkingWarning && (
+        <div className="p-3 rounded-lg bg-amber-50 border border-amber-100">
+          <p className="text-xs text-amber-700 leading-relaxed">
+            {state.linkingWarning}
+          </p>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+        {/* Champ email */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
+            Adresse email
+          </label>
+          <input
+            id="email"
+            type="email"
+            autoComplete="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            disabled={isLoading}
+            placeholder="vous@exemple.com"
+            className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
+                       bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       border-[var(--border-md)] focus:border-[var(--accent)]"
+          />
+          {state.status === 'error' && state.fieldErrors?.email && (
+            <p className="text-xs text-[var(--red)] flex items-center gap-1">
+              {state.fieldErrors.email}
+            </p>
+          )}
+        </div>
+
+        {/* Champ mot de passe */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="password" className="text-sm font-medium text-[var(--text-2)]">
+            Mot de passe
+          </label>
+          <input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            disabled={isLoading}
+            placeholder="Minimum 6 caractères"
+            className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
+                       bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       border-[var(--border-md)] focus:border-[var(--accent)]"
+          />
+          {state.status === 'error' && state.fieldErrors?.password && (
+            <p className="text-xs text-[var(--red)] flex items-center gap-1">
+              {state.fieldErrors.password}
+            </p>
+          )}
+        </div>
+
+        {/* Champ confirmation mot de passe */}
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="confirmPassword" className="text-sm font-medium text-[var(--text-2)]">
+            Confirmer le mot de passe
+          </label>
+          <input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+            disabled={isLoading}
+            placeholder="••••••••"
+            className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
+                       bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
+                       focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
+                       disabled:opacity-50 disabled:cursor-not-allowed
+                       border-[var(--border-md)] focus:border-[var(--accent)]"
+          />
+          {state.status === 'error' && state.fieldErrors?.confirmPassword && (
+            <p className="text-xs text-[var(--red)] flex items-center gap-1">
+              {state.fieldErrors.confirmPassword}
+            </p>
+          )}
+          {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
+            <p className="text-xs text-[var(--red)] flex items-center gap-1">
+              {state.fieldErrors.confirmPassword}
+            </p>
+          )}
+        </div>
+
+        {/* Message d'erreur global */}
+        {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
+          <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+            {state.errorMessage}
+          </p>
         )}
-      </button>
-    </form>
+
+        {/* Bouton submit */}
+        <button
+          type="submit"
+          disabled={isLoading}
+          className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
+                     bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
+                     text-sm font-medium transition-colors duration-150
+                     disabled:opacity-60 disabled:cursor-not-allowed mt-1"
+        >
+          {state.status === 'loading_signup' ? (
+            <>
+              <Loader2 size={15} className="animate-spin shrink-0" />
+              <span>Création en cours...</span>
+            </>
+          ) : state.status === 'linking' ? (
+            <>
+              <Loader2 size={15} className="animate-spin shrink-0" />
+              <span>Configuration de ton abonnement…</span>
+            </>
+          ) : (
+            <span>Créer un compte</span>
+          )}
+        </button>
+      </form>
+    </div>
   )
 }

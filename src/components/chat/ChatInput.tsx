@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useCallback, useState, useEffect, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
 
@@ -11,26 +11,38 @@ interface ChatInputProps {
   isLoading: boolean
   remaining?: number | null
   onLimitReached?: () => void
+  /** Optional override — when passed, takes precedence over internal at-limit state. */
+  disabled?: boolean
+  /** Optional placeholder override. */
+  placeholder?: string
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  remaining,
+  onLimitReached,
+  disabled: disabledProp,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
-  const handleAtLimit = useCallback(() => {
-    setIsAtLimit(true)
-    onLimitReached?.()
-  }, [onLimitReached])
+  // Sync internal at-limit state when remaining prop changes.
+  // Only triggers when remaining transitions to ≤0 or back to >0.
+  useEffect(() => {
+    if (remaining !== null && remaining !== undefined) {
+      if (remaining <= 0 && !isAtLimit) {
+        setIsAtLimit(true)
+        onLimitReached?.()
+      } else if (remaining > 0 && isAtLimit) {
+        setIsAtLimit(false)
+      }
+    }
+  }, [remaining, isAtLimit, onLimitReached])
 
-  // Sync at-limit state when remaining changes
-  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
-    handleAtLimit()
-  }
-  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
-    setIsAtLimit(false)
-  }
-
-  const isDisabled = isLoading || !value.trim() || isAtLimit
+  const effectiveDisabled = disabledProp || isAtLimit || isLoading || !value.trim()
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current
@@ -58,7 +70,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isDisabled) {
+      if (value.trim() && !effectiveDisabled) {
         onSubmit()
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
@@ -73,7 +85,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (!isDisabled) onSubmit()
+          if (!effectiveDisabled) onSubmit()
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
             textareaRef.current.style.overflowY = 'hidden'
@@ -99,7 +111,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
 
         <button
           type="submit"
-          disabled={isDisabled}
+          disabled={effectiveDisabled}
           className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
           aria-label="Envoyer"
         >
