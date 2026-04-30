@@ -18,10 +18,15 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string
+  prefillEmail?: string
+}
+
+export function SignupForm({ sessionId, prefillEmail }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefillEmail ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
@@ -88,6 +93,19 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // Link Stripe session if present (silent, non-blocking)
+    if (sessionId) {
+      try {
+        await fetch('/api/subscriptions/link', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ session_id: sessionId }),
+        })
+      } catch {
+        console.error('Stripe session linking failed, continuing to redirect')
+      }
     }
 
     router.push('/chat')
