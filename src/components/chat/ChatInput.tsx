@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useCallback, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
 
@@ -9,28 +9,24 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
   remaining?: number | null
   onLimitReached?: () => void
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  disabled = false,
+  remaining,
+  onLimitReached,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const [isAtLimit, setIsAtLimit] = useState(false)
+  const isAtLimit = remaining !== null && remaining !== undefined && remaining <= 0
 
-  const handleAtLimit = useCallback(() => {
-    setIsAtLimit(true)
-    onLimitReached?.()
-  }, [onLimitReached])
-
-  // Sync at-limit state when remaining changes
-  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
-    handleAtLimit()
-  }
-  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
-    setIsAtLimit(false)
-  }
-
-  const isDisabled = isLoading || !value.trim() || isAtLimit
+  const isDisabled = isLoading || disabled || isAtLimit || !value.trim()
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current
@@ -88,7 +84,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
           onKeyDown={handleKeyDown}
           placeholder={isAtLimit ? 'Limite atteinte' : 'Pose une question...'}
           rows={1}
-          disabled={isLoading || isAtLimit}
+          disabled={isLoading || isAtLimit || disabled}
           className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
           style={{
             height: 'auto',
