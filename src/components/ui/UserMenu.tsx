@@ -7,26 +7,27 @@ import { logoutAction } from '@/app/actions/auth'
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
+  remaining?: number
+  messagesLimit?: number
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
   growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  free: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Free' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, remaining, messagesLimit }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
-
-  // Badge style
   const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
 
-  // Fermeture clic extérieur + Escape
+  const showQuota = remaining !== undefined && messagesLimit !== undefined && messagesLimit > 0
+
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -59,7 +60,6 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger : avatar rond */}
       <button
         onClick={() => setOpen(!open)}
         aria-label="Menu utilisateur"
@@ -72,13 +72,11 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
         {initials}
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
@@ -89,9 +87,13 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                 </span>
               )}
             </div>
+            {showQuota && (
+              <p className="text-xs text-[var(--text-3)] mt-1">
+                {remaining} messages restants ce mois
+              </p>
+            )}
           </div>
 
-          {/* Bouton déconnexion */}
           <button
             onClick={handleLogout}
             disabled={loggingOut}

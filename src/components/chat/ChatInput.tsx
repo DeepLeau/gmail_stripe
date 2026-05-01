@@ -9,11 +9,12 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
   remaining?: number | null
   onLimitReached?: () => void
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, disabled, remaining, onLimitReached }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
@@ -30,7 +31,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
     setIsAtLimit(false)
   }
 
-  const isDisabled = isLoading || !value.trim() || isAtLimit
+  const effectiveDisabled = isLoading || isAtLimit || disabled === true
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current
@@ -58,7 +59,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      if (value.trim() && !isDisabled) {
+      if (value.trim() && !effectiveDisabled) {
         onSubmit()
         if (textareaRef.current) {
           textareaRef.current.style.height = 'auto'
@@ -73,7 +74,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (!isDisabled) onSubmit()
+          if (!effectiveDisabled) onSubmit()
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
             textareaRef.current.style.overflowY = 'hidden'
@@ -99,7 +100,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
 
         <button
           type="submit"
-          disabled={isDisabled}
+          disabled={effectiveDisabled}
           className="shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors duration-150"
           aria-label="Envoyer"
         >
