@@ -2,15 +2,26 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining?: number | null
+  plan?: string | null
+}
+
+interface ChatApiResponse {
+  text: string
+  remaining?: number | null
+  blocked?: boolean
+}
+
+export function ChatInterface({ remaining, plan }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remainingCount, setRemainingCount] = useState<number | null>(remaining ?? null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -38,19 +49,46 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API /api/chat/send
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
-      const aiMessage: ChatMessage = {
-        id: crypto.randomUUID(),
-        role: 'ai',
-        content: response,
-        timestamp: Date.now(),
+      const response = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      })
+
+      if (response.status === 403) {
+        const data: ChatApiResponse = await response.json()
+        if (data.blocked) {
+          setRemainingCount(0)
+        }
+        return
       }
-      setMessages((prev) => [...prev, aiMessage])
+
+      if (!response.ok) {
+        throw new Error('Failed to send message')
+      }
+
+      const data: ChatApiResponse = await response.json()
+
+      // Mise à jour du quota restant
+      if (data.remaining !== undefined && data.remaining !== null) {
+        setRemainingCount(data.remaining)
+      }
+
+      // Affichage de la réponse AI (sauf si blocked)
+      if (data.text) {
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'ai',
+          content: data.text,
+          timestamp: Date.now(),
+        }
+        setMessages((prev) => [...prev, aiMessage])
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +140,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remainingCount}
         />
       </div>
     </div>

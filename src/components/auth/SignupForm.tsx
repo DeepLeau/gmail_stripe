@@ -4,9 +4,10 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch' | 'linking'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,14 +19,18 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  session_id?: string | null
+}
+
+export function SignupForm({ session_id }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -90,11 +95,36 @@ export function SignupForm() {
       return
     }
 
+    // Si un session_id est présent, lier la session Stripe au nouveau user
+    if (session_id) {
+      setState({ status: 'linking' })
+      try {
+        await linkStripeSessionToUser(session_id)
+      } catch {
+        // La session peut déjà avoir été traitée par le webhook — on continue quand même
+      }
+    }
+
     router.push('/chat')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Badge session Stripe en attente */}
+      {session_id && (
+        <div
+          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium"
+          style={{
+            backgroundColor: 'var(--accent-light)',
+            color: 'var(--accent)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+          }}
+        >
+          <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ backgroundColor: 'var(--accent)' }} />
+          Votre plan a été sélectionné — créez votre compte pour y accéder
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -166,12 +196,7 @@ export function SignupForm() {
                      disabled:opacity-50 disabled:cursor-not-allowed
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
-        {state.status === 'error' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
-          </p>
-        )}
-        {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
+        {(state.status === 'error' || state.status === 'password_mismatch') && state.fieldErrors?.confirmPassword && (
           <p className="text-xs text-[var(--red)] flex items-center gap-1">
             {state.fieldErrors.confirmPassword}
           </p>
@@ -194,10 +219,15 @@ export function SignupForm() {
                    text-sm font-medium transition-colors duration-150
                    disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
-        {isLoading ? (
+        {state.status === 'loading' ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : state.status === 'linking' ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Activation de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
