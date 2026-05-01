@@ -2,18 +2,25 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { decrementUnits } from '@/app/actions/subscription'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan: string
+  remaining: number
+  messagesLimit: number
+}
+
+export function ChatInterface({ plan, remaining, messagesLimit }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(false)
+  const [displayRemaining, setDisplayRemaining] = useState(remaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll automatique vers le bas après chaque message
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -26,9 +33,8 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached || displayRemaining <= 0) return
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,19 +44,32 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
+
     try {
-      const response = await sendMessage(trimmed)
+      // Appel RPC pour décrémenter le quota — utilise 'remaining' (pas 'units_remaining')
+      const result = await decrementUnits()
+
+      const isLimitReached = result.remaining === 0
+      const newRemaining = result.remaining ?? Math.max(0, displayRemaining - 1)
+
+      setDisplayRemaining(newRemaining)
+      if (isLimitReached || newRemaining <= 0) {
+        setLimitReached(true)
+      }
+
+      // Simulated AI response (à remplacer par le vrai endpoint /api/chat/send)
+      await new Promise((resolve) => setTimeout(resolve, 800))
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: "J'ai bien reçu votre message. Voici ma réponse...",
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,9 +77,22 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Bannière limite atteinte */}
+      {limitReached && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+          <span>Vous avez atteint votre limite de messages.</span>
+          <a href="/#pricing" className="ml-auto font-medium underline underline-offset-2 hover:no-underline">
+            Passer au plan supérieur
+          </a>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-        {messages.length === 0 && (
+        {messages.length === 0 && !limitReached && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
               <svg
@@ -102,6 +134,9 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={limitReached || displayRemaining <= 0}
+          remaining={displayRemaining}
+          onLimitReached={() => setLimitReached(true)}
         />
       </div>
     </div>

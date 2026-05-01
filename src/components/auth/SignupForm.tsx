@@ -1,63 +1,58 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useTransition } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
-type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
-  errorMessage?: string
-  fieldErrors?: {
-    email?: string
-    password?: string
-    confirmPassword?: string
-  }
-}
+type SignupFormState = 'idle' | 'signing_up' | 'linking' | 'error'
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
-  const [state, setState] = useState<SignupFormState>({ status: 'idle' })
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id') ?? undefined
+
+  const [state, setState] = useState<SignupFormState>('idle')
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<{
+    email?: string
+    password?: string
+    confirmPassword?: string
+  }>({})
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state === 'signing_up' || state === 'linking'
 
   function validate(): boolean {
-    const fieldErrors: SignupFormState['fieldErrors'] = {}
+    const errors: typeof fieldErrors = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      errors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
-      fieldErrors.email = 'Adresse email invalide'
+      errors.email = 'Adresse email invalide'
     }
 
     if (!password) {
-      fieldErrors.password = 'Le mot de passe est requis'
+      errors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
-      fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
+      errors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
     }
 
     if (!confirmPassword) {
-      fieldErrors.confirmPassword = 'La confirmation est requise'
+      errors.confirmPassword = 'La confirmation est requise'
     } else if (password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
+      errors.confirmPassword = 'Les mots de passe ne correspondent pas'
     }
 
-    if (Object.keys(fieldErrors).length > 0) {
-      setState({ status: 'error', fieldErrors })
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors)
+      setState('error')
       return false
     }
 
@@ -69,11 +64,13 @@ export function SignupForm() {
 
     if (!validate()) return
 
-    setState({ status: 'loading' })
+    setState('signing_up')
+    setErrorMessage(null)
 
     const supabase = createClient()
     if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+      setState('error')
+      setErrorMessage('Service temporairement indisponible')
       return
     }
 
@@ -86,7 +83,24 @@ export function SignupForm() {
       const message = error.message === 'User already registered'
         ? 'Un compte existe déjà avec cet email'
         : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
+      setState('error')
+      setErrorMessage(message)
+      return
+    }
+
+    // Si aucune session Stripe à lier, aller directement au chat
+    if (!sessionId) {
+      router.push('/chat')
+      return
+    }
+
+    // Lier la session Stripe avec retry + backoff
+    setState('linking')
+    const linkResult = await linkStripeSessionToUser(sessionId)
+
+    if (!linkResult.success) {
+      setState('error')
+      setErrorMessage(linkResult.error ?? 'Impossible de finaliser votre abonnement. Contactez le support.')
       return
     }
 
@@ -114,9 +128,9 @@ export function SignupForm() {
                      disabled:opacity-50 disabled:cursor-not-allowed
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
-        {state.status === 'error' && state.fieldErrors?.email && (
+        {state === 'error' && fieldErrors.email && (
           <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.email}
+            {fieldErrors.email}
           </p>
         )}
       </div>
@@ -140,9 +154,9 @@ export function SignupForm() {
                      disabled:opacity-50 disabled:cursor-not-allowed
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
-        {state.status === 'error' && state.fieldErrors?.password && (
+        {state === 'error' && fieldErrors.password && (
           <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.password}
+            {fieldErrors.password}
           </p>
         )}
       </div>
@@ -166,22 +180,26 @@ export function SignupForm() {
                      disabled:opacity-50 disabled:cursor-not-allowed
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
-        {state.status === 'error' && state.fieldErrors?.confirmPassword && (
+        {(state === 'error' || state === 'idle') && fieldErrors.confirmPassword && (
           <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
-          </p>
-        )}
-        {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
-          <p className="text-xs text-[var(--red)] flex items-center gap-1">
-            {state.fieldErrors.confirmPassword}
+            {fieldErrors.confirmPassword}
           </p>
         )}
       </div>
 
+      {/* Message d'état linking (après sign-up réussi, avant redirect) */}
+      {state === 'linking' && (
+        <div className="flex items-center justify-center gap-2 py-3 px-4 rounded-lg
+                        bg-blue-50 border border-blue-200 text-sm text-blue-700">
+          <Loader2 size={14} className="animate-spin shrink-0" />
+          <span>Création de votre abonnement...</span>
+        </div>
+      )}
+
       {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
+      {state === 'error' && !fieldErrors.email && !fieldErrors.password && !fieldErrors.confirmPassword && errorMessage && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
+          {errorMessage}
         </p>
       )}
 
@@ -194,10 +212,15 @@ export function SignupForm() {
                    text-sm font-medium transition-colors duration-150
                    disabled:opacity-60 disabled:cursor-not-allowed mt-1"
       >
-        {isLoading ? (
+        {state === 'signing_up' ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : state === 'linking' ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Activation...</span>
           </>
         ) : (
           <span>Créer un compte</span>
