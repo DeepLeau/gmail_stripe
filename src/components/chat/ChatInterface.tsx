@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
+import { createClient } from '@/lib/supabase/client'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
@@ -11,7 +12,54 @@ export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [planName, setPlanName] = useState<string | null>(null)
+  const [remaining, setRemaining] = useState<number | null>(null)
+  const [quotaLoading, setQuotaLoading] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription quota on mount
+  useEffect(() => {
+    async function fetchQuota() {
+      const supabase = createClient()
+
+      if (!supabase) {
+        setQuotaLoading(false)
+        return
+      }
+
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (!user) {
+        setQuotaLoading(false)
+        return
+      }
+
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('plan, units_used, units_limit')
+        .eq('user_id', user.id)
+        .single()
+
+      if (!error && data) {
+        const planMap: Record<string, string> = {
+          starter: 'Starter',
+          growth: 'Growth',
+          pro: 'Pro',
+        }
+        setPlanName(planMap[data.plan] || data.plan || 'Free')
+        if (data.units_limit !== null) {
+          setRemaining(Math.max(0, data.units_limit - data.units_used))
+        }
+      } else {
+        setPlanName('Free')
+        setRemaining(null)
+      }
+
+      setQuotaLoading(false)
+    }
+
+    fetchQuota()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -38,17 +86,26 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API (qui vérifie le quota et décrémente)
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const result = await sendMessage(trimmed)
+      if ('limitReached' in result && result.limitReached) {
+        // Met à jour l'état local pour refléter la limite atteinte
+        setRemaining(0)
+        return
+      }
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: 'text' in result ? result.text : '',
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+      // Décrémente localement le compteur
+      if (remaining !== null && remaining > 0) {
+        setRemaining((r) => (r !== null ? r - 1 : null))
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -56,8 +113,33 @@ export function ChatInterface() {
     }
   }
 
+  const planBadge =
+    planName && remaining !== null
+      ? `${planName} · ${remaining} message${remaining !== 1 ? 's' : ''} restant${remaining !== 1 ? 's' : ''}`
+      : planName || null
+
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Header avec badge plan */}
+      {planBadge && !quotaLoading && (
+        <div className="shrink-0 mb-4 px-6">
+          <span
+            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: 'var(--accent-light)',
+              color: 'var(--accent)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+            }}
+          >
+            <span
+              className="w-1.5 h-1.5 rounded-full"
+              style={{ backgroundColor: 'var(--accent)' }}
+            />
+            {planBadge}
+          </span>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +184,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>
