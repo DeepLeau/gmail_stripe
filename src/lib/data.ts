@@ -52,7 +52,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Comment fonctionne la tarification ?",
     answer:
-      "Nous proposons deux plans : un plan gratuit limité à 100 questions/mois et 1 boîte mail, et un plan Pro illimité avec plusieurs boîtes mail et une priorité de traitement. Aucune surprise — les prix sont transparents dès la page d'accueil.",
+      "Nous proposons trois plans : Starter à 9 €/mois (50 questions), Growth à 29 €/mois (200 questions) et Pro à 79 €/mois (1 000 questions). Aucune surprise — les prix sont transparents dès la page d'accueil.",
   },
   {
     question: "Mes données email sont-elles en sécurité ?",
@@ -62,7 +62,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Puis-je connecter plusieurs boîtes email ?",
     answer:
-      "Le plan gratuit autorise 1 boîte mail. Le plan Pro permet de connecter autant de boîtes que vous le souhaitez — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
+      "Le nombre de boîtes email dépend du plan. Le plan Growth et au-delà permettent de connecter plusieurs adresses — idéal pour les freelancers et les petites équipes.",
   },
   {
     question: "L'IA peut-elle répondre à mes clients à ma place ?",
@@ -160,9 +160,9 @@ export const plans: Plan[] = [
   {
     name: "Free",
     price: "0",
-    description: "Pour découvrir Emind et automiser vos réponses email.",
+    description: "Pour découvrir Emind sans engagement.",
     features: [
-      "100 questions/mois",
+      "0 message / mois",
       "1 boîte email connectée",
       "Réponses en 10 secondes",
       "Support par email",
@@ -171,18 +171,43 @@ export const plans: Plan[] = [
     highlighted: false,
   },
   {
-    name: "Pro",
-    price: "29",
-    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
+    name: "Starter",
+    price: "9 €",
+    description: "Pour les besoins modestes.",
     features: [
-      "Questions illimitées",
+      "50 messages / mois",
+      "1 boîte email connectée",
+      "Réponses en 10 secondes",
+      "Support par email",
+    ],
+    cta: "Choisir Starter",
+    highlighted: false,
+  },
+  {
+    name: "Growth",
+    price: "29 €",
+    description: "Pour les utilisateurs actifs.",
+    features: [
+      "200 messages / mois",
+      "3 boîtes email",
+      "Réponses en 5 secondes",
+      "Support prioritaire",
+    ],
+    cta: "Choisir Growth",
+    highlighted: true,
+  },
+  {
+    name: "Pro",
+    price: "79 €",
+    description: "Pour les professionals intensifs.",
+    features: [
+      "1 000 messages / mois",
       "Boîtes email illimitées",
-      "Priorité de traitement",
       "Réponses en 3 secondes",
       "Support prioritaire",
     ],
-    cta: "Passer Pro",
-    highlighted: true,
+    cta: "Choisir Pro",
+    highlighted: false,
   },
 ]
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useCallback, useState, useEffect, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
 
@@ -22,13 +22,19 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
     onLimitReached?.()
   }, [onLimitReached])
 
-  // Sync at-limit state when remaining changes
-  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
-    handleAtLimit()
-  }
-  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
-    setIsAtLimit(false)
-  }
+  // FIX: moved sync logic from inline render side-effect to useEffect
+  useEffect(() => {
+    if (remaining !== null && remaining !== undefined && remaining <= 0) {
+      if (!isAtLimit) {
+        handleAtLimit()
+      }
+    } else {
+      if (isAtLimit) {
+        setIsAtLimit(false)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remaining])
 
   const isDisabled = isLoading || !value.trim() || isAtLimit
 

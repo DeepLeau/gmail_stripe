@@ -3,14 +3,22 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
+import { decrementUnits } from '@/app/actions/quota'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+type ChatInterfaceProps = {
+  remaining: number | null
+  plan: string | null
+  subscriptionStatus: string | null
+}
+
+export function ChatInterface({ remaining: initialRemaining, plan, subscriptionStatus }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState<number | null>(initialRemaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -28,6 +36,24 @@ export function ChatInterface() {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
+    // Check quota — treat null remaining as free plan (limit = 0)
+    const effectiveRemaining = remaining !== null ? remaining : 0
+    if (effectiveRemaining <= 0) return
+
+    // Decrement units via Server Action BEFORE sending the message
+    const quotaResult = await decrementUnits()
+
+    if (!quotaResult.success) {
+      // limit_reached or no_subscription — block sending
+      if (quotaResult.remaining <= 0) {
+        setRemaining(0)
+      }
+      return
+    }
+
+    // Update remaining quota locally
+    setRemaining(quotaResult.remaining)
+
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -38,7 +64,7 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API mock
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -50,7 +76,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +128,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>
