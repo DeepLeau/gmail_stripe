@@ -1,13 +1,15 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
+  linkingWarning?: string
   fieldErrors?: {
     email?: string
     password?: string
@@ -18,20 +20,33 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string
+  prefilledEmail?: string
+}
+
+export function SignupForm({ sessionId, prefilledEmail }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
-  const [email, setEmail] = useState('')
+  const [email, setEmail] = useState(prefilledEmail ?? '')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const isLoading = state.status === 'loading'
+  const isLinking = state.status === 'linking'
+  const isSubmitting = isLoading || isLinking
+
+  useEffect(() => {
+    if (prefilledEmail) {
+      setEmail(prefilledEmail)
+    }
+  }, [prefilledEmail])
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -90,6 +105,25 @@ export function SignupForm() {
       return
     }
 
+    // Si session_id Stripe présent, lier le compte
+    if (sessionId) {
+      setState({ status: 'linking' })
+
+      const linkResult = await linkStripeSessionToUser(sessionId)
+
+      if (!linkResult.success) {
+        // Warning non-bloquant — l'user est quand même connecté
+        setState({
+          status: 'error',
+          linkingWarning:
+            "Votre compte est créé. Le lien avec votre abonnement sera établi automatiquement.",
+        })
+        // Redirection malgré l'erreur de linking
+        router.push('/chat')
+        return
+      }
+    }
+
     router.push('/chat')
   }
 
@@ -106,7 +140,7 @@ export function SignupForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
+          disabled={isSubmitting}
           placeholder="vous@exemple.com"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -132,7 +166,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isSubmitting}
           placeholder="Minimum 6 caractères"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -158,7 +192,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isSubmitting}
           placeholder="••••••••"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -185,10 +219,17 @@ export function SignupForm() {
         </p>
       )}
 
+      {/* Warning non-bloquant (linking échoué mais compte créé) */}
+      {state.status === 'error' && state.linkingWarning && (
+        <p className="text-sm text-amber-700 text-center py-2 px-3 rounded-lg bg-amber-50 border border-amber-200">
+          {state.linkingWarning}
+        </p>
+      )}
+
       {/* Bouton submit */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isSubmitting}
         className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
                    bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
                    text-sm font-medium transition-colors duration-150
@@ -198,6 +239,11 @@ export function SignupForm() {
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : isLinking ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Liaison de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
