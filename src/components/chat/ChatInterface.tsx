@@ -7,11 +7,19 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan?: string | null
+  remaining?: number | null
+}
+
+export function ChatInterface({ plan, remaining: initialRemaining }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState<number | null>(initialRemaining ?? null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const isLimitReached = remaining !== null && remaining <= 0
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -26,7 +34,7 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -49,8 +57,20 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Enregistrer l'usage après un appel réussi
+      if (remaining !== null) {
+        try {
+          const res = await fetch('/api/subscription/record-usage', { method: 'POST' })
+          if (res.ok) {
+            setRemaining((prev) => (prev !== null ? prev - 1 : null))
+          }
+        } catch {
+          // Silent fail — quota tracking is best-effort
+        }
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +78,37 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Banner limite atteinte */}
+      {isLimitReached && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 flex items-start gap-3">
+          <svg
+            className="w-5 h-5 text-amber-600 shrink-0 mt-0.5"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+            />
+          </svg>
+          <div>
+            <p className="text-sm font-medium text-amber-900">
+              Limite de messages atteinte
+            </p>
+            <p className="text-xs text-amber-700 mt-0.5">
+              Vous avez utilisé tous vos messages pour ce mois.{' '}
+              <a href="/pricing" className="font-medium underline hover:no-underline">
+                Passez à un plan supérieur
+              </a>{' '}
+              pour continuer.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +153,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={isLimitReached}
+          remaining={remaining}
         />
       </div>
     </div>

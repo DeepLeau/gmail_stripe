@@ -9,11 +9,12 @@ interface ChatInputProps {
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
+  disabled?: boolean
   remaining?: number | null
   onLimitReached?: () => void
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, disabled = false, remaining, onLimitReached }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
@@ -30,7 +31,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
     setIsAtLimit(false)
   }
 
-  const isDisabled = isLoading || !value.trim() || isAtLimit
+  const isDisabled = isLoading || disabled || !value.trim() || isAtLimit
 
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current
