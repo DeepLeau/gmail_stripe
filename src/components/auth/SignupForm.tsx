@@ -6,7 +6,7 @@ import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,14 +18,18 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  sessionId?: string | null
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading = state.status === 'loading' || state.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -88,6 +92,23 @@ export function SignupForm() {
         : 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
+    }
+
+    // If we have a pending Stripe session, link it before redirecting
+    if (sessionId) {
+      setState({ status: 'linking' })
+
+      const { error: linkError } = await supabase.rpc('link_stripe_session_to_user', {
+        p_session_id: sessionId,
+      })
+
+      if (linkError) {
+        setState({
+          status: 'error',
+          errorMessage: 'Votre compte a été créé, mais l\'abonnement n\'a pas pu être activé. Contactez le support.',
+        })
+        return
+      }
     }
 
     router.push('/chat')
@@ -197,7 +218,9 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {state.status === 'linking' ? 'Activation de votre abonnement...' : 'Création en cours...'}
+            </span>
           </>
         ) : (
           <span>Créer un compte</span>
