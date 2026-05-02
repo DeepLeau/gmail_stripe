@@ -6,6 +6,7 @@ import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
+  remaining?: number
   plan?: string | null
 }
 
@@ -15,16 +16,23 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+function getMessageLabel(count: number): string {
+  return count === 1 ? 'message restant' : 'messages restants'
+}
+
+export function UserMenu({ userEmail, remaining = 0, plan = null }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
+
+  const effectivePlan = plan?.toLowerCase() ?? null
+  const isPaidPlan = effectivePlan && effectivePlan !== 'free'
 
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
   // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  const badgeStyle = effectivePlan ? PLAN_BADGE_STYLES[effectivePlan] : null
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -78,7 +86,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
+          {/* Email + Plan badge + Usage */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
@@ -89,6 +97,11 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                 </span>
               )}
             </div>
+            {isPaidPlan && (
+              <p className={`text-xs mt-0.5 ${remaining === 0 ? 'text-red-500 font-medium' : 'text-[var(--text-3)]'}`}>
+                {remaining} {getMessageLabel(remaining)}
+              </p>
+            )}
           </div>
 
           {/* Bouton déconnexion */}

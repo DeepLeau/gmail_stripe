@@ -3,32 +3,31 @@
 import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 interface ChatInputProps {
   value: string
   onChange: (value: string) => void
   onSubmit: () => void
   isLoading: boolean
-  remaining?: number | null
-  onLimitReached?: () => void
+  remaining?: number
+  plan?: string
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, remaining = 0, plan = 'free' }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
 
   const handleAtLimit = useCallback(() => {
     setIsAtLimit(true)
-    onLimitReached?.()
-  }, [onLimitReached])
+    setShowUpgradeBanner(true)
+  }, [])
 
-  // Sync at-limit state when remaining changes
-  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
-    handleAtLimit()
-  }
-  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
+  const handleNotAtLimit = useCallback(() => {
     setIsAtLimit(false)
-  }
+    setShowUpgradeBanner(false)
+  }, [])
 
   const isDisabled = isLoading || !value.trim() || isAtLimit
 
@@ -68,12 +67,36 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
     }
   }
 
+  async function handleSubmitWithGating() {
+    // Check usage via RPC instead of a non-existent API route
+    try {
+      const supabase = createClient()
+      if (supabase) {
+        const { data: quotaData } = await supabase.rpc('get_remaining_quota')
+        if (quotaData !== null && quotaData !== undefined) {
+          const quota = typeof quotaData === 'number' ? quotaData : 0
+          if (quota <= 0) {
+            handleAtLimit()
+            return
+          } else {
+            handleNotAtLimit()
+          }
+        }
+      }
+    } catch {
+      // On error, proceed normally
+    }
+
+    // Proceed with message submission
+    onSubmit()
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <form
         onSubmit={(e) => {
           e.preventDefault()
-          if (!isDisabled) onSubmit()
+          if (!isDisabled) handleSubmitWithGating()
           if (textareaRef.current) {
             textareaRef.current.style.height = 'auto'
             textareaRef.current.style.overflowY = 'hidden'
@@ -107,7 +130,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
         </button>
       </form>
 
-      {isAtLimit && (
+      {showUpgradeBanner && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-red-50 border border-red-200">
           <p className="text-xs text-red-600 font-medium">
             Limite de messages atteinte — Passez au plan supérieur

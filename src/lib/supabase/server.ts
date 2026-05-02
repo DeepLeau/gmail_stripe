@@ -6,6 +6,7 @@
  * jamais continuer silencieusement sans Supabase.
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -42,4 +43,23 @@ export async function createClient() {
       },
     }
   )
+}
+
+/**
+ * Service Role Client — for webhook handlers only.
+ * Uses SUPABASE_SERVICE_ROLE_KEY which bypasses RLS.
+ * NEVER import this in client components.
+ */
+export function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !supabaseServiceRoleKey) {
+    throw new Error(
+      'Missing Supabase environment variables. ' +
+        'Please set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in your environment.'
+    )
+  }
+
+  return createSupabaseClient(supabaseUrl, supabaseServiceRoleKey)
 }

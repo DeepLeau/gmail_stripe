@@ -7,7 +7,12 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining?: number
+  plan?: string
+}
+
+export function ChatInterface({ remaining = 0, plan = 'free' }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
@@ -102,6 +107,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          plan={plan}
         />
       </div>
     </div>
