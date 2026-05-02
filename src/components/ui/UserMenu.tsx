@@ -7,6 +7,7 @@ import { logoutAction } from '@/app/actions/auth'
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
+  remaining?: number | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
@@ -15,7 +16,7 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, remaining }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -78,7 +79,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
+          {/* Email + Plan badge + Remaining counter */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
@@ -89,6 +90,13 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
                 </span>
               )}
             </div>
+            {remaining !== null && remaining !== undefined && (
+              <p className="text-xs text-[var(--text-3)] mt-1">
+                {remaining === 1
+                  ? `${remaining} message restant`
+                  : `${remaining} messages restants`}
+              </p>
+            )}
           </div>
 
           {/* Bouton déconnexion */}

@@ -2,15 +2,24 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendChatMessage, LimitReachedError } from '@/lib/chat/api'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining?: number | null
+  plan?: string | null
+}
+
+export function ChatInterface({ remaining, plan }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [quotaReached, setQuotaReached] = useState(false)
+  const [localRemaining, setLocalRemaining] = useState<number | null>(
+    remaining ?? null
+  )
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -28,6 +37,11 @@ export function ChatInterface() {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
+    // Bloquer si quota atteint
+    if (quotaReached || (localRemaining !== null && localRemaining <= 0)) {
+      return
+    }
+
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -41,16 +55,26 @@ export function ChatInterface() {
     // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendChatMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
-      // Erreur silencieuse — could add error state here
+
+      // Décrémenter le compteur local
+      if (localRemaining !== null) {
+        setLocalRemaining((prev) => (prev !== null ? Math.max(0, prev - 1) : null))
+      }
+    } catch (err) {
+      if (err instanceof LimitReachedError) {
+        setQuotaReached(true)
+        if (localRemaining !== null) {
+          setLocalRemaining(0)
+        }
+      }
     } finally {
       setIsLoading(false)
     }
@@ -95,6 +119,16 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Bandeau limite atteinte */}
+      {quotaReached && (
+        <div className="shrink-0 mb-3 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800 text-center">
+          Limite de messages atteinte —{' '}
+          <a href="/#pricing" className="underline font-medium hover:text-amber-900">
+            passez au plan supérieur
+          </a>
+        </div>
+      )}
+
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
@@ -102,6 +136,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={quotaReached || (localRemaining !== null && localRemaining <= 0)}
         />
       </div>
     </div>

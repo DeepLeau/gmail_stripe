@@ -3,35 +3,75 @@
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
-const plans = [
+interface PlanFeature {
+  text: string
+  included: boolean
+}
+
+interface PlanConfig {
+  name: string
+  slug: string
+  price: string
+  priceId: string
+  period: string
+  description: string
+  features: PlanFeature[]
+  cta: string
+  highlighted: boolean
+  badge?: string
+}
+
+const PLANS_CONFIG: PlanConfig[] = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: 'Starter',
+    slug: 'starter',
+    price: '9',
+    priceId: '', // Set via env in runtime
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour découvrir Emind et automiser vos réponses email.',
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
+      { text: '50 messages / mois', included: true },
+      { text: '1 boîte email connectée', included: true },
+      { text: 'Réponses en 10 secondes', included: true },
+      { text: 'Support par email', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer',
+    highlighted: false,
+  },
+  {
+    name: 'Growth',
+    slug: 'growth',
+    price: '29',
+    priceId: '',
+    period: 'mois',
+    description: 'Pour les freelancers et petites équipes.',
+    features: [
+      { text: '200 messages / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Réponses en 5 secondes', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Support prioritaire', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Growth',
     highlighted: false,
   },
   {
     name: 'Pro',
-    price: '19 €',
+    slug: 'pro',
+    price: '79',
+    priceId: '',
     period: 'mois',
     description: 'Pour les professionnels qui vivent dans leurs emails.',
     features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
+      { text: '1000 messages / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Réponses en 3 secondes', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
+      { text: 'Support prioritaire', included: true },
     ],
     cta: 'Passer à Pro',
     highlighted: true,
@@ -53,6 +93,26 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  async function handleCheckout(slug: string) {
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: slug }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const data = await res.json()
+      if (data.url) {
+        window.location.href = data.url
+      }
+    } catch (err) {
+      console.error('Checkout error:', err)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +162,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Pro quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,9 +172,9 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {PLANS_CONFIG.map((plan, i) => (
             <motion.div
               key={i}
               variants={cardVariants}
@@ -180,7 +240,7 @@ export function Pricing() {
                     className="text-4xl font-bold tracking-tight"
                     style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
                   >
-                    {plan.price}
+                    {plan.price} €
                   </span>
                   <span
                     className="text-sm"
@@ -243,6 +303,7 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                onClick={() => handleCheckout(plan.slug)}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
