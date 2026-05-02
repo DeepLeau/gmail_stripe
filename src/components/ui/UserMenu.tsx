@@ -1,30 +1,32 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { LogOut, Loader2 } from 'lucide-react'
+import { LogOut, Loader2, AlertCircle } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
 
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
+  subscriptionStatus?: string | null
+  remaining?: number | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
   starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
   growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  free: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Free' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, plan, subscriptionStatus, remaining }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
-
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] ?? PLAN_BADGE_STYLES.free : null
+  const isActive = subscriptionStatus === 'active'
+  const isWarning = subscriptionStatus !== null && !isActive
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -59,7 +61,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger : avatar rond */}
+      {/* Trigger */}
       <button
         onClick={() => setOpen(!open)}
         aria-label="Menu utilisateur"
@@ -81,14 +83,33 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
           {/* Email + Plan badge */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
               {badgeStyle && (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
                   {badgeStyle.label}
                 </span>
               )}
+              {isWarning && (
+                <span className="inline-flex items-center gap-1 text-[10px] text-amber-600">
+                  <AlertCircle size={11} />
+                  Inactif
+                </span>
+              )}
             </div>
+
+            {/* Quota messages restants */}
+            {plan && remaining !== null && remaining !== undefined && (
+              <p
+                className="text-[11px] mt-1.5"
+                style={{ color: isWarning ? 'var(--yellow, #facc15)' : 'var(--text-3)' }}
+              >
+                <span className="font-medium tabular-nums" style={{ color: isWarning ? 'var(--yellow, #facc15)' : 'var(--text-2)' }}>
+                  {remaining.toLocaleString('fr-FR')}
+                </span>{' '}
+                messages restants ce mois
+              </p>
+            )}
           </div>
 
           {/* Bouton déconnexion */}
