@@ -1,32 +1,85 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { STRIPE_PLANS } from '@/lib/stripe/config'
+import { formatMessageCount } from '@/lib/stripe/utils'
 
-const plans = [
+type PlanKey = 'starter' | 'growth' | 'pro'
+
+interface PlanConfig {
+  name: string
+  price: string
+  period: string
+  description: string
+  features: { text: string; included: boolean }[]
+  cta: string
+  highlighted: boolean
+  badge?: string
+}
+
+const planKeys: PlanKey[] = ['starter', 'growth', 'pro']
+
+const plans: PlanConfig[] = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: STRIPE_PLANS.starter.displayName,
+    price: '9 €',
     period: 'mois',
     description: 'Pour découvrir Emind sans engagement.',
     features: [
-      { text: '100 questions / mois', included: true },
+      {
+        text: formatMessageCount(STRIPE_PLANS.starter.unitsLimit, {
+          singular: '{count} message',
+          plural: '{count} messages',
+        }) + ' / mois',
+        included: true,
+      },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    name: STRIPE_PLANS.growth.displayName,
+    price: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les utilisateurs fréquents.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      {
+        text: formatMessageCount(STRIPE_PLANS.growth.unitsLimit, {
+          singular: '{count} message',
+          plural: '{count} messages',
+        }) + ' / mois',
+        included: true,
+      },
+      { text: '1 boîte mail connectée', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: false },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Growth',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    name: STRIPE_PLANS.pro.displayName,
+    price: '79 €',
+    period: 'mois',
+    description: 'Pour les professionnels intensifs.',
+    features: [
+      {
+        text: formatMessageCount(STRIPE_PLANS.pro.unitsLimit, {
+          singular: '{count} message',
+          plural: '{count} messages',
+        }) + ' / mois',
+        included: true,
+      },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
@@ -34,8 +87,7 @@ const plans = [
       { text: 'Priorité de traitement', included: true },
     ],
     cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +105,35 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingKey, setLoadingKey] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [redirectingKey, setRedirectingKey] = useState<string | null>(null)
+
+  async function handleCheckout(planKey: PlanKey) {
+    setLoadingKey(planKey)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) {
+        setLoadingKey(null)
+        setRedirectingKey(planKey)
+        window.location.href = url
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+      setLoadingKey(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,9 +183,16 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Growth ou Pro quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-6 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-600 text-center">
+            {error}
+          </div>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -114,165 +202,179 @@ export function Pricing() {
           viewport={{ once: true }}
           className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
-            <motion.div
-              key={i}
-              variants={cardVariants}
-              className="relative rounded-xl p-8 flex flex-col gap-6"
-              style={
-                plan.highlighted
-                  ? {
-                      backgroundColor: 'var(--bg)',
-                      border: '2px solid var(--accent)',
-                      boxShadow:
-                        '0 20px 60px rgba(59, 130, 246, 0.12), 0 0 40px rgba(59, 130, 246, 0.06)',
-                    }
-                  : {
-                      backgroundColor: 'var(--bg)',
-                      border: '1px solid var(--border)',
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
-                    }
-              }
-            >
-              {/* Top accent line for Pro */}
-              {plan.highlighted && (
-                <div
-                  className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
-                  style={{
-                    background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
-                  }}
-                />
-              )}
+          {plans.map((plan, i) => {
+            const planKey = planKeys[i]
+            const isLoading = loadingKey === planKey
+            const isRedirecting = redirectingKey === planKey
+            const isDone = isRedirecting && !loadingKey
 
-              {/* Badge */}
-              {plan.badge && (
-                <div className="flex justify-center">
-                  <span
-                    className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
-                    style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
-                      color: '#fff',
-                    }}
-                  >
-                    {plan.badge}
-                  </span>
-                </div>
-              )}
-
-              {/* Plan name + description */}
-              <div>
-                <p
-                  className="text-lg font-semibold tracking-tight mb-1"
-                  style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
-                >
-                  {plan.name}
-                </p>
-                <p
-                  className="text-sm mb-4"
-                  style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
-                >
-                  {plan.description}
-                </p>
-
-                {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
-                  <span
-                    className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
-                  >
-                    {plan.price}
-                  </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
-                    / {plan.period}
-                  </span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
-
-              {/* Features */}
-              <ul className="flex flex-col gap-3 flex-1">
-                {plan.features.map((feature, j) => (
-                  <li
-                    key={j}
-                    className="flex items-start gap-3 text-sm"
-                    style={{
-                      color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
-                    }}
-                  >
-                    {feature.included ? (
-                      <Check
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--accent)' }}
-                      />
-                    ) : (
-                      <X
-                        size={16}
-                        className="mt-0.5 flex-shrink-0"
-                        strokeWidth={2}
-                        style={{ color: 'var(--text-3)' }}
-                      />
-                    )}
-                    {feature.text}
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+            return (
+              <motion.div
+                key={i}
+                variants={cardVariants}
+                className="relative rounded-xl p-8 flex flex-col gap-6"
                 style={
                   plan.highlighted
                     ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        backgroundColor: 'var(--bg)',
+                        border: '2px solid var(--accent)',
+                        boxShadow:
+                          '0 20px 60px rgba(59, 130, 246, 0.12), 0 0 40px rgba(59, 130, 246, 0.06)',
                       }
                     : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
+                        backgroundColor: 'var(--bg)',
+                        border: '1px solid var(--border)',
+                        boxShadow: '0 1px 3px rgba(0,0,0,0.05), 0 4px 12px rgba(0,0,0,0.03)',
                       }
                 }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
               >
-                {plan.cta}
-              </button>
-            </motion.div>
-          ))}
+                {/* Top accent line for highlighted */}
+                {plan.highlighted && (
+                  <div
+                    className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, var(--accent), transparent)',
+                    }}
+                  />
+                )}
+
+                {/* Badge */}
+                {plan.badge && (
+                  <div className="flex justify-center">
+                    <span
+                      className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
+                      style={{
+                        background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                        color: '#fff',
+                      }}
+                    >
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+
+                {/* Plan name + description */}
+                <div>
+                  <p
+                    className="text-lg font-semibold tracking-tight mb-1"
+                    style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
+                  >
+                    {plan.name}
+                  </p>
+                  <p
+                    className="text-sm mb-4"
+                    style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
+                  >
+                    {plan.description}
+                  </p>
+
+                  {/* Price */}
+                  <div className="flex items-baseline gap-1.5 mb-4">
+                    <span
+                      className="text-4xl font-bold tracking-tight"
+                      style={{
+                        color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                        letterSpacing: '-0.04em',
+                      }}
+                    >
+                      {plan.price}
+                    </span>
+                    <span
+                      className="text-sm"
+                      style={{ color: 'var(--text-3)' }}
+                    >
+                      / {plan.period}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div
+                  className="h-px w-full"
+                  style={{ backgroundColor: 'var(--border)' }}
+                />
+
+                {/* Features */}
+                <ul className="flex flex-col gap-3 flex-1">
+                  {plan.features.map((feature, j) => (
+                    <li
+                      key={j}
+                      className="flex items-start gap-3 text-sm"
+                      style={{
+                        color: feature.included ? 'var(--text-2)' : 'var(--text-3)',
+                      }}
+                    >
+                      {feature.included ? (
+                        <Check
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: 'var(--accent)' }}
+                        />
+                      ) : (
+                        <X
+                          size={16}
+                          className="mt-0.5 flex-shrink-0"
+                          strokeWidth={2}
+                          style={{ color: 'var(--text-3)' }}
+                        />
+                      )}
+                      {feature.text}
+                    </li>
+                  ))}
+                </ul>
+
+                {/* CTA */}
+                <button
+                  disabled={isLoading || isDone}
+                  className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+                  style={
+                    plan.highlighted
+                      ? {
+                          backgroundColor: isDone ? 'var(--accent)' : isLoading ? 'var(--accent)' : 'var(--accent)',
+                          color: '#fff',
+                          boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          color: 'var(--text-2)',
+                          border: '1px solid var(--border-md)',
+                        }
+                  }
+                  onMouseEnter={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-hi)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform = ''
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-md)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
+                    }
+                  }}
+                  onClick={() => handleCheckout(planKey)}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={15} className="animate-spin shrink-0" />
+                      <span>Redirection...</span>
+                    </>
+                  ) : isDone ? (
+                    <span>Redirection en cours...</span>
+                  ) : (
+                    plan.cta
+                  )}
+                </button>
+              </motion.div>
+            )
+          })}
         </motion.div>
       </div>
     </section>
