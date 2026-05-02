@@ -1,9 +1,8 @@
 'use client'
 
-import { useRef, useCallback, useState, useEffect, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
-import { formatMessageCount } from '@/lib/stripe/utils'
 
 interface ChatInputProps {
   value: string
@@ -14,28 +13,22 @@ interface ChatInputProps {
   onLimitReached?: () => void
 }
 
-export function ChatInput({
-  value,
-  onChange,
-  onSubmit,
-  isLoading,
-  remaining,
-  onLimitReached,
-}: ChatInputProps) {
+export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
-  // Sync at-limit state when remaining prop changes
-  useEffect(() => {
-    const atLimit = remaining !== null && remaining !== undefined && remaining <= 0
-    if (atLimit !== isAtLimit) {
-      setIsAtLimit(atLimit)
-      if (atLimit) {
-        onLimitReached?.()
-      }
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remaining])
+  const handleAtLimit = useCallback(() => {
+    setIsAtLimit(true)
+    onLimitReached?.()
+  }, [onLimitReached])
+
+  // Sync at-limit state when remaining changes
+  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
+    handleAtLimit()
+  }
+  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
+    setIsAtLimit(false)
+  }
 
   const isDisabled = isLoading || !value.trim() || isAtLimit
 
@@ -75,18 +68,6 @@ export function ChatInput({
     }
   }
 
-  // Compute placeholder text from remaining
-  const placeholderText = (() => {
-    if (isAtLimit) return 'Limite atteinte'
-    if (remaining !== null && remaining !== undefined) {
-      return formatMessageCount(remaining, {
-        singular: '{count} message restant',
-        plural: '{count} messages restants',
-      })
-    }
-    return 'Pose une question...'
-  })()
-
   return (
     <div className="flex flex-col gap-2">
       <form
@@ -105,7 +86,7 @@ export function ChatInput({
           value={value}
           onChange={handleChange}
           onKeyDown={handleKeyDown}
-          placeholder={placeholderText}
+          placeholder={isAtLimit ? 'Limite atteinte' : 'Pose une question...'}
           rows={1}
           disabled={isLoading || isAtLimit}
           className="flex-1 bg-transparent text-sm text-gray-900 placeholder:text-gray-400 resize-none focus:outline-none disabled:cursor-not-allowed min-h-[24px]"
