@@ -1,6 +1,9 @@
 import type { Metadata } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
 import './globals.css'
+import { createClient } from '@/lib/supabase/server'
+import { UserMenu } from '@/components/ui/UserMenu'
+import { Navbar } from '@/components/ui/Navbar'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -28,11 +31,41 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
+async function getUserSubscription() {
+  let remaining = 0
+  let plan = 'free'
+
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('messages_limit, messages_used, plan')
+        .eq('user_id', user.id)
+        .eq('status', 'active')
+        .single()
+
+      if (subscription) {
+        remaining = Math.max(0, subscription.messages_limit - subscription.messages_used)
+        plan = subscription.plan ?? 'free'
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch subscription:', err)
+  }
+
+  return { remaining, plan }
+}
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  const { remaining, plan } = await getUserSubscription()
+
   return (
     <html
       lang="fr"
@@ -67,6 +100,7 @@ export default function RootLayout({
         </svg>
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
+        <Navbar />
         {children}
       </body>
     </html>

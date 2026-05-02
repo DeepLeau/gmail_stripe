@@ -1,6 +1,32 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { createClient } from '@/lib/supabase/server'
 
-export default function ChatPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function ChatPage() {
+  let remaining = 0
+  let plan = 'free'
+
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user) {
+      const { data: subscription } = await supabase
+        .from('user_subscriptions')
+        .select('units_limit, units_used, plan')
+        .eq('user_id', user.id)
+        .maybeSingle()
+
+      if (subscription) {
+        remaining = Math.max(0, (subscription.units_limit ?? 0) - (subscription.units_used ?? 0))
+        plan = subscription.plan ?? 'free'
+      }
+    }
+  } catch (err) {
+    console.error('Failed to fetch subscription:', err)
+  }
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -13,7 +39,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface remaining={remaining} plan={plan} />
         </div>
       </div>
     </main>
