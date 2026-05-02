@@ -6,26 +6,14 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
-import { formatMessageCount } from '@/lib/stripe/utils'
 
-interface ChatInterfaceProps {
-  plan?: string | null
-  remaining: number | null
-  unitsLimit: number | null
-}
-
-function getUsageColor(pct: number): string {
-  if (pct > 0.9) return 'var(--red)'
-  if (pct > 0.75) return '#f97316'
-  return 'var(--accent)'
-}
-
-export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProps) {
+export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Scroll automatique vers le bas après chaque message
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -40,6 +28,7 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
+    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -49,6 +38,7 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
+    // Appel API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -60,16 +50,11 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse
+      // Erreur silencieuse — could add error state here
     } finally {
       setIsLoading(false)
     }
   }
-
-  const showUsageMeter = remaining !== null && unitsLimit !== null && unitsLimit > 0
-  const usagePct = showUsageMeter ? (unitsLimit - remaining) / unitsLimit : 0
-  const usageColor = showUsageMeter ? getUsageColor(usagePct) : 'var(--accent)'
-  const used = showUsageMeter ? unitsLimit - remaining : 0
 
   return (
     <div className="flex flex-col h-full py-6">
@@ -77,17 +62,13 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
-            <div
-              className="w-10 h-10 rounded-full flex items-center justify-center mb-4"
-              style={{ backgroundColor: 'var(--accent-light)' }}
-            >
+            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
               <svg
-                className="w-5 h-5"
+                className="w-5 h-5 text-blue-600"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
                 strokeWidth={1.5}
-                style={{ color: 'var(--accent)' }}
               >
                 <path
                   strokeLinecap="round"
@@ -96,16 +77,10 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
                 />
               </svg>
             </div>
-            <p
-              className="text-sm font-medium mb-1"
-              style={{ color: 'var(--text)' }}
-            >
+            <p className="text-sm font-medium text-gray-900 mb-1">
               Pose tes questions à tes emails
             </p>
-            <p
-              className="text-xs max-w-xs"
-              style={{ color: 'var(--text-2)' }}
-            >
+            <p className="text-xs text-gray-500 max-w-xs">
               Dicte une question en langage naturel. L&apos;IA explore tes emails et te répond.
             </p>
           </div>
@@ -120,33 +95,6 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Usage meter — only shown when quota tracking is active */}
-      {showUsageMeter && (
-        <div className="shrink-0 flex items-center gap-3 px-1 mb-2">
-          <div
-            className="flex-1 h-1.5 rounded-full overflow-hidden"
-            style={{ backgroundColor: 'var(--border)' }}
-          >
-            <div
-              className="h-full rounded-full transition-all duration-300"
-              style={{
-                width: `${Math.min(100, usagePct * 100)}%`,
-                backgroundColor: usageColor,
-              }}
-            />
-          </div>
-          <span
-            className="text-xs tabular-nums shrink-0"
-            style={{ color: usageColor }}
-          >
-            {formatMessageCount(remaining, {
-              singular: '{count} restant',
-              plural: '{count} restants',
-            })}
-          </span>
-        </div>
-      )}
-
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
@@ -154,7 +102,6 @@ export function ChatInterface({ plan, remaining, unitsLimit }: ChatInterfaceProp
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
-          remaining={remaining}
         />
       </div>
     </div>
