@@ -17,16 +17,21 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
+  // Type guard so TypeScript reliably narrows `remaining` to `number` before the <= comparison
+  function isNumber(v: number | null | undefined): v is number {
+    return v !== null && v !== undefined
+  }
+
   const handleAtLimit = useCallback(() => {
     setIsAtLimit(true)
     onLimitReached?.()
   }, [onLimitReached])
 
   // Sync at-limit state when remaining changes
-  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
+  if (isNumber(remaining) && remaining <= 0 && !isAtLimit) {
     handleAtLimit()
   }
-  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
+  if ((!isNumber(remaining) || remaining > 0) && isAtLimit) {
     setIsAtLimit(false)
   }
 
