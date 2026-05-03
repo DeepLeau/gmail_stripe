@@ -6,11 +6,20 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { decrementUnits } from '@/app/actions/subscription'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription?: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState<number | null>(
+    subscription?.units_remaining ?? null
+  )
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,11 +31,23 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  // Sync remaining when subscription prop changes
+  useEffect(() => {
+    setRemaining(subscription?.units_remaining ?? null)
+  }, [subscription?.units_remaining])
+
+  const handleLimitReached = () => {
+    // Limit reached — input will be disabled by ChatInput via remaining prop
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Gating: block if no quota left
+    if (remaining !== null && remaining <= 0) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -41,6 +62,14 @@ export function ChatInterface() {
     // Appel API
     setIsLoading(true)
     try {
+      // Decrement quota (best-effort — non-blocking for the AI response UX)
+      const quotaResult = await decrementUnits()
+      if (quotaResult.error === 'limit_reached' && quotaResult.remaining !== undefined) {
+        setRemaining(quotaResult.remaining)
+      } else if (remaining !== null) {
+        setRemaining((r) => Math.max(0, (r ?? 0) - 1))
+      }
+
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -50,7 +79,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +131,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>

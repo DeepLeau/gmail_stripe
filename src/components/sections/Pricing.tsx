@@ -1,41 +1,61 @@
 'use client'
 
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { createCheckoutSessionAction } from '@/app/actions/stripe'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    key: 'start',
+    name: 'Start',
+    price: '9 €',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour commencer à exploiter tes emails avec l\'IA.',
     features: [
-      { text: '100 questions / mois', included: true },
+      { text: '10 questions / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    key: 'scale',
+    name: 'Scale',
+    price: '29 €',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les équipes qui vivent dans leurs emails.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '50 questions / mois', included: true },
+      { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    key: 'team',
+    name: 'Team',
+    price: '49 €',
+    period: 'mois',
+    description: 'Pour les équipes qui ne peuvent plus s\'en passer.',
+    features: [
+      { text: '100 questions / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +73,27 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [loadingKey, setLoadingKey] = React.useState<string | null>(null)
+  const [error, setError] = React.useState<string | null>(null)
+
+  async function handleCheckout(planKey: string) {
+    setLoadingKey(planKey)
+    setError(null)
+    try {
+      const result = await createCheckoutSessionAction(planKey)
+      if (result?.url) {
+        window.location.href = result.url
+      } else {
+        throw new Error('Aucune URL de checkout retournée')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoadingKey(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,9 +143,18 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à un plan payant quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-6 text-center">
+            <p className="text-sm text-[var(--red)] py-2 px-4 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+              {error}
+            </p>
+          </div>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -112,11 +162,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.key}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +184,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted plan */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -150,7 +200,7 @@ export function Pricing() {
                   <span
                     className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
                     style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                      background: 'linear-gradient(135deg, var(--accent), var(--violet))',
                       color: '#fff',
                     }}
                   >
@@ -178,24 +228,21 @@ export function Pricing() {
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
+                    style={{
+                      color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                      letterSpacing: '-0.04em',
+                    }}
                   >
                     {plan.price}
                   </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
+                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>
                     / {plan.period}
                   </span>
                 </div>
               </div>
 
               {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
+              <div className="h-px w-full" style={{ backgroundColor: 'var(--border)' }} />
 
               {/* Features */}
               <ul className="flex flex-col gap-3 flex-1">
@@ -245,31 +292,33 @@ export function Pricing() {
                 }
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent-hi)'
+                    ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform = ''
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-md)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
                   }
                 }}
+                onClick={() => handleCheckout(plan.key)}
+                disabled={loadingKey !== null}
               >
-                {plan.cta}
+                {loadingKey === plan.key ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin shrink-0" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
@@ -278,3 +327,6 @@ export function Pricing() {
     </section>
   )
 }
+
+// Need React for useState — add import
+import React from 'react'

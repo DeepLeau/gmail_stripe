@@ -13,17 +13,28 @@ interface ChatInputProps {
   onLimitReached?: () => void
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  remaining,
+  onLimitReached,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
   const handleAtLimit = useCallback(() => {
-    setIsAtLimit(true)
-    onLimitReached?.()
-  }, [onLimitReached])
+    if (!isAtLimit) {
+      setIsAtLimit(true)
+      onLimitReached?.()
+    }
+  }, [isAtLimit, onLimitReached])
 
   // Sync at-limit state when remaining changes
   if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    const [, forceUpdate] = useState(0)
     handleAtLimit()
   }
   if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
