@@ -1,7 +1,7 @@
 'use client'
 
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Zap } from 'lucide-react'
 
 const plans = [
   {
@@ -154,6 +154,7 @@ export function Pricing() {
                       color: '#fff',
                     }}
                   >
+                    <Zap size={10} className="mr-1 mt-0.5" strokeWidth={2.5} />
                     {plan.badge}
                   </span>
                 </div>
@@ -228,7 +229,8 @@ export function Pricing() {
               </ul>
 
               {/* CTA */}
-              <button
+              <a
+                href={plan.highlighted ? '/#signup' : '/signup'}
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={
                   plan.highlighted
@@ -243,34 +245,9 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
               >
                 {plan.cta}
-              </button>
+              </a>
             </motion.div>
           ))}
         </motion.div>

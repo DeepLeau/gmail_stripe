@@ -7,10 +7,13 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
+type ChatState = 'idle' | 'loading' | 'error' | 'limit_reached'
+
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [chatState, setChatState] = useState<ChatState>('idle')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,11 +25,20 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const handleLimitReached = () => {
+    setChatState('limit_reached')
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Bloquer l'envoi si limite atteinte
+    if (chatState === 'limit_reached') {
+      return
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -40,6 +52,7 @@ export function ChatInterface() {
 
     // Appel API
     setIsLoading(true)
+    setChatState('loading')
     try {
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
@@ -49,8 +62,12 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+      setChatState('idle')
     } catch {
-      // Erreur silencieuse — could add error state here
+      setChatState('error')
+      setMessages((prev) => prev.slice(0, -1))
+      // Rétablir l'état après un délai
+      setTimeout(() => setChatState('idle'), 2000)
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +119,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>
