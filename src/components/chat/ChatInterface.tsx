@@ -6,11 +6,17 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { decrementUnits } from '@/app/actions/subscription'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining: number
+}
+
+export function ChatInterface({ remaining: initialRemaining }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState(initialRemaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,11 +28,21 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const handleLimitReached = () => {
+    // The ChatInput component handles displaying the limit banner.
+    // The parent ensures messages are not sent when at limit via isDisabled.
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    if (remaining <= 0) {
+      handleLimitReached()
+      return
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -37,10 +53,14 @@ export function ChatInterface() {
     }
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
+    setRemaining((prev) => Math.max(0, prev - 1))
 
     // Appel API
     setIsLoading(true)
     try {
+      // Decrement units server-side
+      await decrementUnits()
+
       const response = await sendMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
@@ -102,6 +122,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>
