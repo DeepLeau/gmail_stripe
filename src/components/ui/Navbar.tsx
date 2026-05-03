@@ -4,9 +4,15 @@ import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Menu, X, ArrowRight } from 'lucide-react'
 
+interface SubscriptionInfo {
+  plan: string | null
+  units_remaining: number | null
+}
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [subscription, setSubscription] = useState<SubscriptionInfo | null>(null)
 
   useEffect(() => {
     const handleScroll = () => {
@@ -15,6 +21,25 @@ export function Navbar() {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    async function fetchSubscription() {
+      try {
+        const res = await fetch('/api/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setSubscription({ plan: data.plan, units_remaining: data.units_remaining })
+        }
+      } catch {
+        // silently fail — Navbar stays clean
+      }
+    }
+    fetchSubscription()
+  }, [])
+
+  const planLabel = subscription?.plan
+    ? subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)
+    : null
 
   const navLinks = [
     { label: 'Fonctionnalités', href: '#features' },
@@ -40,6 +65,27 @@ export function Navbar() {
           >
             Emind
           </a>
+
+          {/* Plan badge (desktop only) */}
+          {planLabel && (
+            <div className="hidden sm:flex items-center gap-2 flex-shrink-0">
+              <span
+                className="inline-flex items-center h-6 px-2.5 rounded-full text-[11px] font-semibold uppercase tracking-wider"
+                style={{
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent)',
+                  border: '1px solid rgba(59, 130, 246, 0.25)',
+                }}
+              >
+                {planLabel}
+              </span>
+              {subscription?.units_remaining !== null && subscription?.units_remaining !== undefined && (
+                <span className="text-xs text-[var(--text-3)]">
+                  {subscription.units_remaining} {subscription.units_remaining === 1 ? 'message' : 'messages'} restants
+                </span>
+              )}
+            </div>
+          )}
 
           {/* Desktop nav */}
           <nav className="hidden md:flex items-center gap-1 flex-1 justify-center">
