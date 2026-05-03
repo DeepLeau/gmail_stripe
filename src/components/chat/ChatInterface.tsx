@@ -1,16 +1,39 @@
 'use client'
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect, useCallback, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining: number | null
+  plan: string | null
+}
+
+function UpgradeBanner() {
+  return (
+    <div className="mx-4 mb-4 flex items-center justify-between gap-3 px-4 py-3 rounded-xl bg-[var(--accent)]/8 border border-[var(--accent)]/20">
+      <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+        Limite de messages atteinte
+      </p>
+      <a
+        href="/#pricing"
+        className="shrink-0 h-8 px-3 flex items-center justify-center rounded-lg text-xs font-medium text-white"
+        style={{ backgroundColor: 'var(--accent)' }}
+      >
+        Mettre à niveau
+      </a>
+    </div>
+  )
+}
+
+export function ChatInterface({ remaining: initialRemaining, plan }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [remaining, setRemaining] = useState<number | null>(initialRemaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,39 +45,59 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
-    e?.preventDefault()
+  // Ne pas écraser le remaining local si la prop n'a pas changé (évite les fights)
+  useEffect(() => {
+    setRemaining((prev) => {
+      if (initialRemaining !== null && prev === null) return initialRemaining
+      return prev
+    })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-    const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+  const isAtLimit = remaining !== null && remaining <= 0
 
-    // Ajout du message utilisateur
-    const userMessage: ChatMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: trimmed,
-      timestamp: Date.now(),
-    }
-    setMessages((prev) => [...prev, userMessage])
-    setInputValue('')
+  const handleSubmit = useCallback(
+    async (e?: FormEvent) => {
+      e?.preventDefault()
 
-    // Appel API
-    setIsLoading(true)
-    try {
-      const response = await sendMessage(trimmed)
-      const aiMessage: ChatMessage = {
+      const trimmed = inputValue.trim()
+      if (!trimmed || isLoading || isAtLimit) return
+
+      // Ajout du message utilisateur
+      const userMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        role: 'ai',
-        content: response,
+        role: 'user',
+        content: trimmed,
         timestamp: Date.now(),
       }
-      setMessages((prev) => [...prev, aiMessage])
-    } catch {
-      // Erreur silencieuse — could add error state here
-    } finally {
-      setIsLoading(false)
-    }
-  }
+      setMessages((prev) => [...prev, userMessage])
+      setInputValue('')
+
+      // Appel API
+      setIsLoading(true)
+      try {
+        const response = await sendMessage(trimmed)
+        const aiMessage: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: 'ai',
+          content: response,
+          timestamp: Date.now(),
+        }
+        setMessages((prev) => [...prev, aiMessage])
+
+        // Décrémenter le quota après un envoi réussi
+        const { decrementUnits } = await import('@/app/actions/subscription')
+        const result = await decrementUnits()
+        if (result.success && result.remaining !== undefined) {
+          setRemaining(result.remaining)
+        }
+      } catch {
+        // Erreur silencieuse
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [inputValue, isLoading, isAtLimit]
+  )
 
   return (
     <div className="flex flex-col h-full py-6">
@@ -95,6 +138,9 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Bannière limite atteinte */}
+      {isAtLimit && <UpgradeBanner />}
+
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
@@ -102,6 +148,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>

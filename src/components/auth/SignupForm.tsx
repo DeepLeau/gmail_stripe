@@ -1,12 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
+
+interface SignupFormProps {
+  sessionId?: string | null
+}
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,20 +21,23 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
-  const router = useRouter()
+export function SignupForm({ sessionId }: SignupFormProps) {
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const hook = useSignupWithStripeLinking({ pendingSessionId: sessionId ?? undefined })
+
+  // Mapper les statuts du hook vers ceux du composant
+  const isLoading = hook.status === 'signing_up'
+  const isLinking = hook.status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -40,12 +46,6 @@ export function SignupForm() {
       fieldErrors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
       fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
     }
 
     if (!confirmPassword) {
@@ -64,34 +64,15 @@ export function SignupForm() {
     return true
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+async function handleSubmit(e: React.FormEvent) {
+      e.preventDefault()
 
-    if (!validate()) return
+      if (!validate()) return
 
-    setState({ status: 'loading' })
+      setState({ status: 'idle' })
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
-      return
+      await hook.signup(email.trim(), password)
     }
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
-  }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
@@ -106,7 +87,7 @@ export function SignupForm() {
           autoComplete="email"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="vous@exemple.com"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -132,7 +113,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="Minimum 6 caractères"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -158,7 +139,7 @@ export function SignupForm() {
           autoComplete="new-password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
-          disabled={isLoading}
+          disabled={isLoading || isLinking}
           placeholder="••••••••"
           className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
                      bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
@@ -178,17 +159,19 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
-        </p>
-      )}
+{/* Message d'erreur global */}
+        {(state.status === 'error' || hook.status === 'error') &&
+          !state.fieldErrors?.confirmPassword &&
+          (state.errorMessage || hook.error) && (
+            <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+              {state.errorMessage || hook.error}
+            </p>
+          )}
 
       {/* Bouton submit */}
       <button
         type="submit"
-        disabled={isLoading}
+        disabled={isLoading || isLinking}
         className="h-10 px-4 flex items-center justify-center gap-2 rounded-lg
                    bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white
                    text-sm font-medium transition-colors duration-150
@@ -198,6 +181,11 @@ export function SignupForm() {
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
             <span>Création en cours...</span>
+          </>
+        ) : isLinking ? (
+          <>
+            <Loader2 size={15} className="animate-spin shrink-0" />
+            <span>Liaison de votre abonnement...</span>
           </>
         ) : (
           <span>Créer un compte</span>
