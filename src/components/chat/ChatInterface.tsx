@@ -13,6 +13,35 @@ export function ChatInterface() {
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
+  // Quota / subscription states
+  const [loadingQuota, setLoadingQuota] = useState(true)
+  const [subscriptionData, setSubscriptionData] = useState<{
+    plan: string | null
+    units_used: number
+    units_limit: number | null
+    units_remaining: number | null
+    status: string
+  } | null>(null)
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
+
+  // Fetch subscription status on mount
+  useEffect(() => {
+    async function fetchQuota() {
+      try {
+        const res = await fetch('/api/subscriptions/remaining', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setSubscriptionData(data)
+        }
+      } catch {
+        // Silently fail — quota state remains at default (unlimited)
+      } finally {
+        setLoadingQuota(false)
+      }
+    }
+    fetchQuota()
+  }, [])
+
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
     if (messages.length > 0) {
@@ -49,6 +78,22 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Increment quota after successful AI response
+      try {
+        const incrementRes = await fetch('/api/subscriptions/increment', { method: 'POST' })
+        if (incrementRes.status === 429) {
+          setShowUpgradeBanner(true)
+        } else if (incrementRes.ok) {
+          const updated = await incrementRes.json()
+          setSubscriptionData(updated)
+          if (updated.units_remaining !== null && updated.units_remaining <= 0) {
+            setShowUpgradeBanner(true)
+          }
+        }
+      } catch {
+        // Increment failure — non-critical, continue normally
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -56,11 +101,22 @@ export function ChatInterface() {
     }
   }
 
+  const remaining = subscriptionData?.units_remaining ?? null
+
   return (
     <div className="flex flex-col h-full py-6">
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
-        {messages.length === 0 && (
+        {loadingQuota && (
+          <div className="flex items-center justify-center h-full">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-8 h-8 rounded-full border-2 border-blue-200 border-t-blue-600 animate-spin" />
+              <p className="text-xs text-gray-400">Chargement...</p>
+            </div>
+          </div>
+        )}
+
+        {!loadingQuota && messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center mb-4">
               <svg
@@ -95,6 +151,21 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
+      {/* Bannière limite atteinte */}
+      {showUpgradeBanner && (
+        <div className="shrink-0 mb-3 mx-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200">
+          <p className="text-xs text-red-600 font-medium">
+            Limite de messages atteinte
+          </p>
+          <a
+            href="/#pricing"
+            className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline shrink-0"
+          >
+            Voir les plans
+          </a>
+        </div>
+      )}
+
       {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
@@ -102,6 +173,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={() => setShowUpgradeBanner(true)}
         />
       </div>
     </div>
