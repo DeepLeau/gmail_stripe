@@ -1,6 +1,24 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { getCurrentSubscription } from '@/app/actions/subscription'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
-export default function ChatPage() {
+export default async function ChatPage() {
+  const subscriptionState = await getCurrentSubscription()
+
+  // Adapt SubscriptionState → SubscriptionData for the client component
+  const subscription: SubscriptionData | null = subscriptionState
+    ? {
+        plan: subscriptionState.plan,
+        units_used: subscriptionState.units_used,
+        units_limit: subscriptionState.units_limit,
+        units_remaining:
+          subscriptionState.units_limit !== null
+            ? Math.max(0, subscriptionState.units_limit - subscriptionState.units_used)
+            : null,
+        status: subscriptionState.subscription_status,
+      }
+    : null
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -13,7 +31,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface subscription={subscription} />
         </div>
       </div>
     </main>
