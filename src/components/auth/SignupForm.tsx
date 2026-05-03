@@ -2,11 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'error' | 'password_mismatch' | 'plan_linked'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -18,7 +18,11 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+type SignupFormProps = {
+  sessionId?: string
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -26,6 +30,7 @@ export function SignupForm() {
   const [confirmPassword, setConfirmPassword] = useState('')
 
   const isLoading = state.status === 'loading'
+  const isPlanLinked = state.status === 'plan_linked'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -90,7 +95,52 @@ export function SignupForm() {
       return
     }
 
+    // Link Stripe session to user if present
+    if (sessionId) {
+      try {
+        const { error: rpcError } = await supabase.rpc('link_stripe_session_to_user', {
+          p_session_id: sessionId,
+        })
+        if (rpcError) {
+          // Log but don't block redirect
+          console.error('[SignupForm] Failed to link Stripe session:', rpcError)
+        }
+      } catch (err) {
+        console.error('[SignupForm] RPC link error:', err)
+      }
+
+      // Show plan activation state briefly before redirect
+      setState({ status: 'plan_linked' })
+      await new Promise((resolve) => setTimeout(resolve, 1800))
+    }
+
     router.push('/chat')
+  }
+
+  // Plan activation success state
+  if (isPlanLinked) {
+    return (
+      <div className="flex flex-col items-center gap-4 py-6">
+        <div
+          className="w-12 h-12 rounded-full flex items-center justify-center"
+          style={{
+            backgroundColor: 'var(--accent-glow)',
+            border: '1px solid var(--accent)',
+          }}
+        >
+          <CheckCircle size={24} style={{ color: 'var(--accent)' }} strokeWidth={1.5} />
+        </div>
+        <div className="text-center">
+          <p className="text-sm font-semibold text-[var(--text-1)] mb-1">
+            Bienvenue ! Ton plan est activé.
+          </p>
+          <p className="text-xs text-[var(--text-3)]">
+            Redirection vers le chat...
+          </p>
+        </div>
+        <Loader2 size={18} className="animate-spin" style={{ color: 'var(--accent)' }} />
+      </div>
+    )
   }
 
   return (
