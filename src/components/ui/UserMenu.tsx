@@ -3,16 +3,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
+import { getPlanDisplayName } from '@/lib/stripe/config'
 
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
-}
-
-const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
-  growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
-  pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
@@ -20,13 +15,13 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  const badgeLabel = plan ? getPlanDisplayName(plan as Parameters<typeof getPlanDisplayName>[0]) : null
+  const badgeStyle = plan
+    ? { bg: 'bg-blue-100', text: 'text-blue-700' }
+    : null
 
-  // Fermeture clic extérieur + Escape
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -59,7 +54,6 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
 
   return (
     <div ref={ref} className="relative">
-      {/* Trigger : avatar rond */}
       <button
         onClick={() => setOpen(!open)}
         aria-label="Menu utilisateur"
@@ -72,26 +66,25 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
         {initials}
       </button>
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute right-0 top-full mt-2 z-50
                         min-w-[220px] w-max
                         bg-white border border-[var(--border-md)]
                         rounded-lg shadow-xl overflow-hidden py-1">
-          {/* Email + Plan badge */}
           <div className="px-3 py-2.5 border-b border-[var(--border)]">
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
-              {badgeStyle && (
-                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
-                  {badgeStyle.label}
+              {badgeStyle && badgeLabel && (
+                <span
+                  className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}
+                >
+                  {badgeLabel}
                 </span>
               )}
             </div>
           </div>
 
-          {/* Bouton déconnexion */}
           <button
             onClick={handleLogout}
             disabled={loggingOut}

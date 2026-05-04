@@ -2,42 +2,7 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
-
-const plans = [
-  {
-    name: 'Free',
-    price: '0 €',
-    period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
-    features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
-      { text: 'Priorité de traitement', included: false },
-    ],
-    cta: 'Commencer gratuitement',
-    highlighted: false,
-  },
-  {
-    name: 'Pro',
-    price: '19 €',
-    period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
-    features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: true },
-      { text: 'Priorité de traitement', included: true },
-    ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
-  },
-]
+import { STRIPE_PLANS, type StripePlanName } from '@/lib/stripe/config'
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -52,7 +17,98 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
+interface PlanDisplayConfig {
+  id: StripePlanName
+  name: string
+  price: string
+  period: string
+  description: string
+  features: { text: string; included: boolean }[]
+  cta: string
+  highlighted: boolean
+  badge?: string
+}
+
+// Prix et descriptions statiques (priceId vient de STRIPE_PLANS pour le checkout)
+const PLAN_DISPLAY: Record<StripePlanName, Omit<PlanDisplayConfig, 'id' | 'cta' | 'highlighted' | 'badge'>> = {
+  start: {
+    name: 'Start',
+    price: '0',
+    period: 'mois',
+    description: 'Pour découvrir l\'assistant email.',
+    features: [
+      { text: '10 messages / mois', included: true },
+      { text: 'Accès aux emails', included: true },
+      { text: 'Réponses IA basiques', included: true },
+      { text: 'Support prioritaire', included: false },
+    ],
+  },
+  scale: {
+    name: 'Scale',
+    price: '19',
+    period: 'mois',
+    description: 'Pour les utilisateurs intensifs.',
+    features: [
+      { text: '50 messages / mois', included: true },
+      { text: 'Accès aux emails', included: true },
+      { text: 'Réponses IA avancées', included: true },
+      { text: 'Support prioritaire', included: true },
+    ],
+  },
+  team: {
+    name: 'Team',
+    price: '49',
+    period: 'mois',
+    description: 'Pour les équipes qui collaborent.',
+    features: [
+      { text: '100 messages / mois', included: true },
+      { text: 'Accès aux emails', included: true },
+      { text: 'Réponses IA avancées', included: true },
+      { text: 'Support prioritaire', included: true },
+    ],
+  },
+}
+
+function buildPlanConfigs(): PlanDisplayConfig[] {
+  const planKeys: StripePlanName[] = ['start', 'scale', 'team']
+  return planKeys.map((key) => {
+    const display = PLAN_DISPLAY[key]
+    const cfg = STRIPE_PLANS[key]
+    return {
+      id: key,
+      name: display.name,
+      price: display.price,
+      period: display.period,
+      description: display.description,
+      features: display.features,
+      cta: key === 'start' ? 'Commencer gratuitement' : `Passer à ${display.name}`,
+      highlighted: key === 'scale',
+      badge: key === 'scale' ? 'Recommandé' : undefined,
+    }
+  })
+}
+
 export function Pricing() {
+  const plans = buildPlanConfigs()
+
+  async function handleCheckout(planKey: string) {
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planKey }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +158,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à l&apos;un des plans payants quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,11 +168,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.id}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +190,6 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -144,13 +199,12 @@ export function Pricing() {
                 />
               )}
 
-              {/* Badge */}
               {plan.badge && (
                 <div className="flex justify-center">
                   <span
                     className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
                     style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                      background: 'linear-gradient(135deg, var(--accent), var(--violet))',
                       color: '#fff',
                     }}
                   >
@@ -159,7 +213,6 @@ export function Pricing() {
                 </div>
               )}
 
-              {/* Plan name + description */}
               <div>
                 <p
                   className="text-lg font-semibold tracking-tight mb-1"
@@ -174,30 +227,24 @@ export function Pricing() {
                   {plan.description}
                 </p>
 
-                {/* Price */}
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
+                    style={{
+                      color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                      letterSpacing: '-0.04em',
+                    }}
                   >
                     {plan.price}
                   </span>
-                  <span
-                    className="text-sm"
-                    style={{ color: 'var(--text-3)' }}
-                  >
+                  <span className="text-sm" style={{ color: 'var(--text-3)' }}>
                     / {plan.period}
                   </span>
                 </div>
               </div>
 
-              {/* Divider */}
-              <div
-                className="h-px w-full"
-                style={{ backgroundColor: 'var(--border)' }}
-              />
+              <div className="h-px w-full" style={{ backgroundColor: 'var(--border)' }} />
 
-              {/* Features */}
               <ul className="flex flex-col gap-3 flex-1">
                 {plan.features.map((feature, j) => (
                   <li
@@ -227,7 +274,6 @@ export function Pricing() {
                 ))}
               </ul>
 
-              {/* CTA */}
               <button
                 className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
                 style={
@@ -247,27 +293,22 @@ export function Pricing() {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
                       'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
+                    ;(e.currentTarget as HTMLButtonElement).style.transform = 'translateY(-1px)'
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--accent)'
                   }
                 }}
                 onMouseLeave={(e) => {
                   if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
+                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor = 'var(--accent)'
                     ;(e.currentTarget as HTMLButtonElement).style.transform = ''
                   } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
+                    ;(e.currentTarget as HTMLButtonElement).style.borderColor = 'var(--border-md)'
+                    ;(e.currentTarget as HTMLButtonElement).style.color = 'var(--text-2)'
                   }
                 }}
+                onClick={() => handleCheckout(plan.id)}
               >
                 {plan.cta}
               </button>

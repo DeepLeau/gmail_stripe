@@ -6,14 +6,20 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Scroll automatique vers le bas après chaque message
+  const isLimitReached = subscription?.units_remaining === 0
+
   useEffect(() => {
     if (messages.length > 0) {
       requestAnimationFrame(() => {
@@ -26,9 +32,8 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimitReached) return
 
-    // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -38,7 +43,6 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
     setIsLoading(true)
     try {
       const response = await sendMessage(trimmed)
@@ -50,7 +54,7 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // silent
     } finally {
       setIsLoading(false)
     }
@@ -102,6 +106,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={subscription?.units_remaining ?? null}
         />
       </div>
     </div>

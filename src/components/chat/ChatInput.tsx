@@ -13,7 +13,14 @@ interface ChatInputProps {
   onLimitReached?: () => void
 }
 
-export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onLimitReached }: ChatInputProps) {
+export function ChatInput({
+  value,
+  onChange,
+  onSubmit,
+  isLoading,
+  remaining,
+  onLimitReached,
+}: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
@@ -22,7 +29,6 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
     onLimitReached?.()
   }, [onLimitReached])
 
-  // Sync at-limit state when remaining changes
   if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
     handleAtLimit()
   }
