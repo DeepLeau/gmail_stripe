@@ -7,11 +7,52 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
+interface SubscriptionStatus {
+  plan: string | null
+  units_remaining: number | null
+  units_limit: number | null
+  subscription_status: string
+}
+
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionStatus | null>(null)
+  const [showUpgradeBanner, setShowUpgradeBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription status on mount
+  useEffect(() => {
+    async function loadSubscription() {
+      try {
+        const res = await fetch('/api/subscription/status', { cache: 'no-store' })
+        if (res.ok) {
+          const data: SubscriptionStatus = await res.json()
+          setSubscription(data)
+          // If the API returns units_remaining as a number, use it
+          // If null, user is on free/unlimited plan
+        } else if (res.status === 404) {
+          // No subscription found — free tier
+          setSubscription({
+            plan: null,
+            units_remaining: null,
+            units_limit: null,
+            subscription_status: 'free',
+          })
+        }
+      } catch {
+        // Network or parse error — treat as free tier, don't block UX
+        setSubscription({
+          plan: null,
+          units_remaining: null,
+          units_limit: null,
+          subscription_status: 'free',
+        })
+      }
+    }
+    loadSubscription()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -27,6 +68,31 @@ export function ChatInterface() {
 
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    // Check quota before sending — if remaining is explicitly 0, block
+    if (subscription?.units_remaining === 0) {
+      setShowUpgradeBanner(true)
+      return
+    }
+
+    // Decrement quota via API (fire and forget — don't block UI)
+    let newRemaining = subscription?.units_remaining ?? null
+    if (subscription?.units_remaining !== null) {
+      try {
+        const res = await fetch('/api/subscription/use-unit', { method: 'POST', cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          newRemaining = data.units_remaining
+          setSubscription(prev => prev ? { ...prev, units_remaining: newRemaining } : prev)
+        } else if (res.status === 402) {
+          setShowUpgradeBanner(true)
+          setSubscription(prev => prev ? { ...prev, units_remaining: 0 } : prev)
+          return
+        }
+      } catch {
+        // Decrement failed — allow send, quota will re-sync on next page load
+      }
+    }
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -50,14 +116,44 @@ export function ChatInterface() {
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
   }
 
+  const remaining = subscription?.units_remaining ?? null
+
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Banner — limite atteinte, mise à jour nécessaire */}
+      {showUpgradeBanner && (
+        <div className="mb-4 flex items-center justify-between gap-3 p-4 rounded-xl shrink-0"
+          style={{
+            backgroundColor: 'color-mix(in srgb, var(--amber) 10%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--amber) 25%, transparent)',
+          }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+              style={{ backgroundColor: 'color-mix(in srgb, var(--amber) 15%, transparent)' }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: 'var(--amber)' }}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+            </div>
+            <p className="text-sm font-medium" style={{ color: 'var(--amber)' }}>
+              Limite de messages atteinte
+            </p>
+          </div>
+          <button
+            onClick={() => window.location.href = '/#pricing'}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg shrink-0 transition-colors"
+            style={{ backgroundColor: 'var(--amber)', color: '#fff' }}
+          >
+            Passer à un plan supérieur
+          </button>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +198,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>

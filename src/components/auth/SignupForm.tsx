@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -15,10 +16,14 @@ type SignupFormState = {
   }
 }
 
+interface SignupFormProps {
+  sessionId?: string
+}
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ sessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
@@ -77,7 +82,7 @@ export function SignupForm() {
       return
     }
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     })
@@ -90,11 +95,38 @@ export function SignupForm() {
       return
     }
 
+    // Link Stripe session if sessionId is present (guest checkout flow)
+    if (sessionId && data.user) {
+      let linkResult = await linkStripeSessionToUser(sessionId)
+
+      // Retry if webhook has not arrived yet
+      if (!linkResult.success && linkResult.error === 'pending_not_found' && linkResult.retry) {
+        await new Promise(r => setTimeout(r, 2000))
+        linkResult = await linkStripeSessionToUser(sessionId)
+      }
+
+      if (!linkResult.success) {
+        // Linking failed — user is created but plan not attached.
+        // Proceed anyway; plan can be re-linked from settings later.
+        console.warn('Stripe session linking failed:', linkResult.error)
+      }
+    }
+
     router.push('/chat')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {sessionId && (
+        <div className="mb-2 p-3 rounded-lg text-sm text-center" style={{
+          backgroundColor: 'color-mix(in srgb, var(--accent) 8%, transparent)',
+          border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+          color: 'var(--accent)',
+        }}>
+          Finalisez votre inscription pour accéder à votre plan
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
