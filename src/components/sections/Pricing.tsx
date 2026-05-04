@@ -1,43 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
-
-const plans = [
-  {
-    name: 'Free',
-    price: '0 €',
-    period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
-    features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
-      { text: 'Priorité de traitement', included: false },
-    ],
-    cta: 'Commencer gratuitement',
-    highlighted: false,
-  },
-  {
-    name: 'Pro',
-    price: '19 €',
-    period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
-    features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: true },
-      { text: 'Priorité de traitement', included: true },
-    ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
-  },
-]
+import { PLAN_LIST, UNIT_LABEL } from '@/lib/stripe/config'
+import { createCheckoutSession } from '@/app/actions/stripe'
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -52,7 +19,111 @@ const cardVariants: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
 }
 
+// Build features for each plan from PLAN_LIST
+function buildFeatures(planId: string): { text: string; included: boolean }[] {
+  const allFeatures = [
+    { text: `${PLAN_LIST.start.limit} ${UNIT_LABEL}s / mois`, included: true },
+    { text: '1 boîte email connectée', included: true },
+    { text: 'Résumés de threads', included: true },
+    { text: 'Recherche en langage naturel', included: true },
+    { text: 'Multi-comptes', included: false },
+    { text: 'Priorité de traitement', included: false },
+  ]
+
+  if (planId === 'start') return allFeatures.slice(0, 4)
+
+  if (planId === 'scale') {
+    return [
+      { text: `${PLAN_LIST.scale.limit} ${UNIT_LABEL}s / mois`, included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ]
+  }
+
+  if (planId === 'team') {
+    return [
+      { text: `${PLAN_LIST.team.limit} ${UNIT_LABEL}s / mois`, included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: true },
+    ]
+  }
+
+  return allFeatures
+}
+
+interface PlanCardData {
+  id: string
+  name: string
+  price: string
+  period: string
+  description: string
+  features: { text: string; included: boolean }[]
+  cta: string
+  highlighted: boolean
+  badge?: string
+}
+
+const PLANS: PlanCardData[] = [
+  {
+    id: 'start',
+    name: PLAN_LIST.start.display_name,
+    price: `${PLAN_LIST.start.price_cents / 100} €`,
+    period: 'mois',
+    description: 'Pour découvrir Emind sans engagement.',
+    features: buildFeatures('start'),
+    cta: 'Choisir Start',
+    highlighted: false,
+  },
+  {
+    id: 'scale',
+    name: PLAN_LIST.scale.display_name,
+    price: `${PLAN_LIST.scale.price_cents / 100} €`,
+    period: 'mois',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
+    features: buildFeatures('scale'),
+    cta: 'Choisir Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    id: 'team',
+    name: PLAN_LIST.team.display_name,
+    price: `${PLAN_LIST.team.price_cents / 100} €`,
+    period: 'mois',
+    description: 'Pour les équipes qui vivent dans leurs emails.',
+    features: buildFeatures('team'),
+    cta: 'Choisir Team',
+    highlighted: false,
+  },
+]
+
 export function Pricing() {
+  const [loadingPlanId, setLoadingPlanId] = useState<string | null>(null)
+  const [errorPlanId, setErrorPlanId] = useState<string | null>(null)
+
+  async function handleCheckout(planId: string) {
+    setLoadingPlanId(planId)
+    setErrorPlanId(null)
+    try {
+      const result = await createCheckoutSession(planId)
+      if (result.url) {
+        window.location.href = result.url
+      } else {
+        setErrorPlanId(planId)
+      }
+    } catch {
+      setErrorPlanId(planId)
+    } finally {
+      setLoadingPlanId(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +173,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à l&apos;offre qui te correspond.
           </motion.p>
         </div>
 
@@ -112,11 +183,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {PLANS.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.id}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +205,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted plan */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -228,49 +299,67 @@ export function Pricing() {
               </ul>
 
               {/* CTA */}
-              <button
-                className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
-                style={
-                  plan.highlighted
-                    ? {
-                        backgroundColor: 'var(--accent)',
-                        color: '#fff',
-                        boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
-                      }
-                    : {
-                        backgroundColor: 'transparent',
-                        color: 'var(--text-2)',
-                        border: '1px solid var(--border-md)',
-                      }
-                }
-                onMouseEnter={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent-hi)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform =
-                      'translateY(-1px)'
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--accent)'
+              <div className="flex flex-col gap-2">
+                <button
+                  className="w-full h-11 rounded-xl text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2"
+                  style={
+                    plan.highlighted
+                      ? {
+                          backgroundColor: 'var(--accent)',
+                          color: '#fff',
+                          boxShadow: '0 4px 16px rgba(59, 130, 246, 0.3)',
+                        }
+                      : {
+                          backgroundColor: 'transparent',
+                          color: 'var(--text-2)',
+                          border: '1px solid var(--border-md)',
+                        }
                   }
-                }}
-                onMouseLeave={(e) => {
-                  if (plan.highlighted) {
-                    ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                      'var(--accent)'
-                    ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-                  } else {
-                    ;(e.currentTarget as HTMLButtonElement).style.borderColor =
-                      'var(--border-md)'
-                    ;(e.currentTarget as HTMLButtonElement).style.color =
-                      'var(--text-2)'
-                  }
-                }}
-              >
-                {plan.cta}
-              </button>
+                  onMouseEnter={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--accent-hi)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform =
+                        'translateY(-1px)'
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+                        'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--accent)'
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (plan.highlighted) {
+                      ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
+                        'var(--accent)'
+                      ;(e.currentTarget as HTMLButtonElement).style.transform = ''
+                    } else {
+                      ;(e.currentTarget as HTMLButtonElement).style.borderColor =
+                        'var(--border-md)'
+                      ;(e.currentTarget as HTMLButtonElement).style.color =
+                        'var(--text-2)'
+                    }
+                  }}
+                  onClick={() => handleCheckout(plan.id)}
+                  disabled={loadingPlanId !== null}
+                >
+                  {loadingPlanId === plan.id ? (
+                    <>
+                      <span className="animate-spin inline-block w-4 h-4 border-2 border-current border-t-transparent rounded-full" />
+                      Redirection...
+                    </>
+                  ) : (
+                    plan.cta
+                  )}
+                </button>
+
+                {/* Inline error message */}
+                {errorPlanId === plan.id && (
+                  <p className="text-xs text-center" style={{ color: 'var(--red)' }}>
+                    Une erreur est survenue, veuillez réessayer.
+                  </p>
+                )}
+              </div>
             </motion.div>
           ))}
         </motion.div>
