@@ -1,3 +1,4 @@
+import { createClient } from '@/lib/supabase/client'
 import { MOCK_RESPONSES, MOCK_RESPONSES_COUNT } from './responses'
 
 /**
@@ -52,17 +53,55 @@ export interface ChatResponse {
 }
 
 /**
- * API-compatible chat message sender.
+ * Result type for gated chat messages.
+ */
+export interface SendResult {
+  limitReached?: boolean
+  text?: string
+  units_used?: number
+  model?: string
+}
+
+/**
+ * API-compatible chat message sender with quota gating.
+ *
  * Calls the real /api/chat/send endpoint.
- * 
+ * Before sending, calls the decrement_units RPC to enforce quota.
+ * If the RPC reports limit_reached, returns { limitReached: true } without calling the API.
+ * If no subscription is found (error code 'no_subscription'), allows the message through.
+ *
  * @param content - The user's message content
  * @param _userId - User ID (kept for API compatibility, not used in mock)
- * @returns Promise resolving to ChatResponse with AI text and units_used
+ * @returns Promise resolving to SendResult
  */
 export async function sendChatMessage(
   content: string,
   _userId?: string
-): Promise<ChatResponse> {
+): Promise<SendResult> {
+  const supabase = createClient()
+
+  // Try to decrement units via RPC — enforces quota gating
+  if (supabase) {
+    try {
+      const { data: decrementData, error: decrementError } = await supabase.rpc('decrement_units')
+
+      if (!decrementError && decrementData) {
+        const result = decrementData as { success: boolean; reason?: string }
+        if (result.success === false && result.reason === 'limit_reached') {
+          return { limitReached: true }
+        }
+      }
+
+      // If error is 'no_subscription' (free user or non-subscriber), allow through
+      if (decrementError?.code === 'no_subscription') {
+        // No-op — let the message pass (free-tier or unregistered user)
+      }
+    } catch {
+      // Network error or unexpected failure — pass the message through rather than block
+    }
+  }
+
+  // Proceed to real API
   const response = await fetch('/api/chat/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -73,7 +112,7 @@ export async function sendChatMessage(
     if (response.status === 403) {
       const error = await response.json()
       if (error.error === 'limit_reached') {
-        throw new Error('limit_reached')
+        return { limitReached: true }
       }
     }
     throw new Error('Failed to send message')

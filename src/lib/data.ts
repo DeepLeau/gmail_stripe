@@ -25,19 +25,22 @@ export type TrustItem = {
   icon: string
 }
 
+// Re-export Plan type from stripe config for compatibility
 export type Plan = {
+  id: string
   name: string
-  price: string
-  description: string
-  features: string[]
-  cta: string
-  highlighted: boolean
+  display_name: string
+  price_cents: number
+  messages_limit: number
 }
 
 export type FooterLink = {
   label: string
   href: string
 }
+
+// Re-export PLAN_LIST from stripe config for all components that need plan data
+export { PLAN_LIST as plans } from '@/lib/stripe/config'
 
 // ============================================================
 // Question pairs — section "Exemples de questions"
@@ -52,7 +55,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Comment fonctionne la tarification ?",
     answer:
-      "Nous proposons deux plans : un plan gratuit limité à 100 questions/mois et 1 boîte mail, et un plan Pro illimité avec plusieurs boîtes mail et une priorité de traitement. Aucune surprise — les prix sont transparents dès la page d'accueil.",
+      "Nous proposons trois plans : Start (10 questions/mois, 10€/mois), Scale (50 questions/mois, 39€/mois) et Team (100 questions/mois, 79€/mois). Aucune surprise — les prix sont transparents dès la page d'accueil.",
   },
   {
     question: "Mes données email sont-elles en sécurité ?",
@@ -62,7 +65,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Puis-je connecter plusieurs boîtes email ?",
     answer:
-      "Le plan gratuit autorise 1 boîte mail. Le plan Pro permet de connecter autant de boîtes que vous le souhaitez — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
+      "Tous nos plans permettent de connecter plusieurs boîtes email. L'offre Team est idéale pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
   },
   {
     question: "L'IA peut-elle répondre à mes clients à ma place ?",
@@ -149,40 +152,6 @@ export const trustItems: TrustItem[] = [
     description:
       "Nous ne conservons pas vos messages. Le traitement est transient — l'IA analyse sans mémoriser.",
     icon: "EyeOff",
-  },
-]
-
-// ============================================================
-// Plans — section "Tarification"
-// ============================================================
-
-export const plans: Plan[] = [
-  {
-    name: "Free",
-    price: "0",
-    description: "Pour découvrir Emind et automiser vos réponses email.",
-    features: [
-      "100 questions/mois",
-      "1 boîte email connectée",
-      "Réponses en 10 secondes",
-      "Support par email",
-    ],
-    cta: "Commencer gratuitement",
-    highlighted: false,
-  },
-  {
-    name: "Pro",
-    price: "29",
-    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
-    features: [
-      "Questions illimitées",
-      "Boîtes email illimitées",
-      "Priorité de traitement",
-      "Réponses en 3 secondes",
-      "Support prioritaire",
-    ],
-    cta: "Passer Pro",
-    highlighted: true,
   },
 ]
 

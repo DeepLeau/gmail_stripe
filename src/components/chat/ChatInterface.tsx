@@ -1,17 +1,83 @@
 'use client'
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { createClient } from '@/lib/supabase/client'
+
+interface SubscriptionData {
+  plan: string | null
+  units_used: number
+  units_limit: number | null
+  units_remaining: number | null
+  status: string
+}
+
+function getProgressColor(percentage: number): string {
+  if (percentage >= 90) return 'var(--red)'
+  if (percentage >= 75) return 'var(--yellow)'
+  return 'var(--green)'
+}
+
+function getProgressBg(percentage: number): string {
+  if (percentage >= 90) return 'rgba(239, 68, 68, 0.12)'
+  if (percentage >= 75) return 'rgba(234, 179, 8, 0.12)'
+  return 'rgba(34, 197, 94, 0.12)'
+}
+
+const PLAN_DISPLAY_NAMES: Record<string, string> = {
+  start: 'Start',
+  scale: 'Scale',
+  team: 'Team',
+}
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
+  const [showBanner, setShowBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch subscription on mount
+  useEffect(() => {
+    async function fetchSubscription() {
+      const supabase = createClient()
+      if (!supabase) return
+
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data, error } = await supabase
+        .from('user_subscriptions')
+        .select('plan, units_used, units_limit, subscription_status')
+        .eq('user_id', user.id)
+        .single()
+
+      if (error || !data) {
+        // No subscription — silent, don't show banner
+        return
+      }
+
+      const units_limit = data.units_limit ?? null
+      const units_used = data.units_used ?? 0
+      const units_remaining = units_limit !== null ? Math.max(0, units_limit - units_used) : null
+
+      setSubscription({
+        plan: data.plan ?? null,
+        units_used,
+        units_limit,
+        units_remaining,
+        status: data.subscription_status ?? 'free',
+      })
+      setShowBanner(true)
+    }
+
+    fetchSubscription()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +88,14 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
-    e?.preventDefault()
+  const remaining = subscription?.units_remaining ?? null
+  const isLimitReached = remaining === 0
 
+  const handleSubmit = async () => {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
+
+    if (isLimitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -49,6 +118,22 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Refresh subscription state after message (units_used may have increased)
+      if (subscription) {
+        setSubscription((prev) =>
+          prev
+            ? {
+                ...prev,
+                units_used: prev.units_used + 1,
+                units_remaining:
+                  prev.units_limit !== null
+                    ? Math.max(0, prev.units_limit - prev.units_used - 1)
+                    : null,
+              }
+            : null
+        )
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -56,8 +141,69 @@ export function ChatInterface() {
     }
   }
 
+  const percentage =
+    subscription?.units_limit && subscription.units_limit > 0
+      ? (subscription.units_used / subscription.units_limit) * 100
+      : 0
+
+  const progressColor = getProgressColor(percentage)
+  const progressBg = getProgressBg(percentage)
+
+  const planLabel =
+    subscription?.plan
+      ? PLAN_DISPLAY_NAMES[subscription.plan] ?? subscription.plan
+      : null
+
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Subscription quota banner */}
+      {showBanner && planLabel && remaining !== null && (
+        <div
+          className="shrink-0 mb-4 px-4 py-3 rounded-xl flex items-center gap-4"
+          style={{
+            backgroundColor: progressBg,
+            border: `1px solid ${progressColor}22`,
+          }}
+        >
+          {/* Plan label */}
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <p
+              className="text-xs font-semibold tracking-wide uppercase"
+              style={{ color: progressColor }}
+            >
+              Plan {planLabel}
+            </p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text)' }}>
+              {remaining}{' '}
+              <span style={{ color: 'var(--text-2)' }}>messages restants</span>
+            </p>
+          </div>
+
+          {/* Progress bar */}
+          <div className="flex-1 min-w-0">
+            <div
+              className="h-1.5 rounded-full overflow-hidden"
+              style={{ backgroundColor: 'var(--border)' }}
+            >
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${Math.min(percentage, 100)}%`,
+                  backgroundColor: progressColor,
+                }}
+              />
+            </div>
+          </div>
+
+          {/* Limit reached warning */}
+          {isLimitReached && (
+            <p className="text-xs font-medium shrink-0" style={{ color: progressColor }}>
+              Limite atteinte
+            </p>
+          )}
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -100,8 +246,10 @@ export function ChatInterface() {
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
-          onSubmit={() => handleSubmit()}
+          onSubmit={handleSubmit}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={() => {}}
         />
       </div>
     </div>
