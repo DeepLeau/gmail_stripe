@@ -10,9 +10,14 @@ type UserMenuProps = {
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  // Legacy plans (backward compat)
   starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
   growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  // New guest-subscription-quota plans
+  start: { bg: 'bg-green-100', text: 'text-green-700', label: 'Start' },
+  scale: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Scale' },
+  team: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Team' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
@@ -83,11 +88,11 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
-              {badgeStyle && (
+              {badgeStyle ? (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
                   {badgeStyle.label}
                 </span>
-              )}
+              ) : null}
             </div>
           </div>
 
