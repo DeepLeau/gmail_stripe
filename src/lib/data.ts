@@ -156,6 +156,60 @@ export const trustItems: TrustItem[] = [
 // Plans — section "Tarification"
 // ============================================================
 
+export type PlanConfig = {
+  id: string
+  name: string
+  slug: string
+  price: number
+  priceLabel: string
+  messagesLimit: number
+  messagesLabel: string
+  priceId: string
+}
+
+export const PLANS: PlanConfig[] = [
+  {
+    id: 'start',
+    name: 'Start',
+    slug: 'start',
+    price: 10,
+    priceLabel: '10 €/mois',
+    messagesLimit: 10,
+    messagesLabel: '10 messages/mois',
+    priceId: process.env.STRIPE_PRICE_START ?? '',
+  },
+  {
+    id: 'scale',
+    name: 'Scale',
+    slug: 'scale',
+    price: 39,
+    priceLabel: '39 €/mois',
+    messagesLimit: 50,
+    messagesLabel: '50 messages/mois',
+    priceId: process.env.STRIPE_PRICE_SCALE ?? '',
+  },
+  {
+    id: 'team',
+    name: 'Team',
+    slug: 'team',
+    price: 79,
+    priceLabel: '79 €/mois',
+    messagesLimit: 100,
+    messagesLabel: '100 messages/mois',
+    priceId: process.env.STRIPE_PRICE_TEAM ?? '',
+  },
+]
+
+export function getPlanBySlug(slug: string): PlanConfig | undefined {
+  return PLANS.find((p) => p.slug === slug)
+}
+
+export function getMessagesLabel(slug: string): string {
+  const plan = getPlanBySlug(slug)
+  return plan?.messagesLabel ?? ''
+}
+
+// Legacy export kept for backward compat with existing consumers
 export const plans: Plan[] = [
   {
     name: "Free",

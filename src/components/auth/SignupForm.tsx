@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,20 +18,37 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+interface SignupFormProps {
+  pendingSessionId?: string
+}
+
+export function SignupForm({ pendingSessionId }: SignupFormProps) {
   const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const { status: hookStatus, errorMessage: hookError, signup } = useSignupWithStripeLinking({
+    pendingSessionId,
+    redirectTo: '/chat',
+  })
+
+  // Le hookStatus 'signing_up' | 'linking' reflète le loading du signup + linking
+  const isLoading =
+    state.status === 'loading' ||
+    hookStatus === 'signing_up' ||
+    hookStatus === 'linking'
+
+  // Priorité à l'erreur du hook (linking non-bloquant)
+  const displayError =
+    hookError ?? (state.status === 'error' ? state.errorMessage : undefined)
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -40,12 +57,6 @@ export function SignupForm() {
       fieldErrors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
       fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
-    }
-
-    if (password && confirmPassword && password !== confirmPassword) {
-      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
-      return false
     }
 
     if (!confirmPassword) {
@@ -69,28 +80,18 @@ export function SignupForm() {
 
     if (!validate()) return
 
-    setState({ status: 'loading' })
+    // Reset state local avant d'appeler le hook
+    setState({ status: 'idle' })
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+    const result = await signup(email.trim(), password)
+
+    if (!result.ok) {
+      // Le hook expose déjà errorMessage — rien à faire ici
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
+    // Le hook gère la redirection (link + redirect ou redirect direct)
+    // Code post-signup si nécessaire (analytics, insert profiles, etc.)
   }
 
   return (
@@ -179,9 +180,9 @@ export function SignupForm() {
       </div>
 
       {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
+      {displayError && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
+          {displayError}
         </p>
       )}
 
@@ -197,7 +198,9 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {hookStatus === 'linking' ? 'Liaison en cours...' : 'Création en cours...'}
+            </span>
           </>
         ) : (
           <span>Créer un compte</span>

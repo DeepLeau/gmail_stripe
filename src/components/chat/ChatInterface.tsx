@@ -7,11 +7,42 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
+type SubscriptionStatus = {
+  plan: string | null
+  units_used: number
+  units_limit: number | null
+  units_remaining: number | null
+  status: string
+  current_period_end: string | null
+} | null
+
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Subscription status
+  const [loadingStatus, setLoadingStatus] = useState(true)
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus>(null)
+  const [statusError, setStatusError] = useState<string | null>(null)
+
+  // Fetch subscription status on mount
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        const res = await fetch('/api/chat/status', { cache: 'no-store' })
+        if (!res.ok) throw new Error('Erreur de chargement du statut')
+        const data = await res.json()
+        setSubscriptionStatus(data)
+      } catch {
+        setStatusError('Impossible de charger votre quota. Les réponses sont limitées.')
+      } finally {
+        setLoadingStatus(false)
+      }
+    }
+    fetchStatus()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +53,13 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  const isLimitReached = subscriptionStatus?.units_remaining === 0
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || isLimitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -49,15 +82,82 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Mise à jour du compteur local après un message envoyé
+      if (subscriptionStatus) {
+        setSubscriptionStatus((prev) =>
+          prev
+            ? {
+                ...prev,
+                units_used: prev.units_used + 1,
+                units_remaining:
+                  prev.units_remaining !== null
+                    ? Math.max(0, prev.units_remaining - 1)
+                    : null,
+              }
+            : prev
+        )
+      }
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
   }
 
+  const planLabel = subscriptionStatus?.plan
+    ? subscriptionStatus.plan.charAt(0).toUpperCase() + subscriptionStatus.plan.slice(1)
+    : null
+
+  const remainingLabel =
+    subscriptionStatus?.units_remaining !== null && subscriptionStatus?.units_remaining !== undefined
+      ? `${subscriptionStatus.units_remaining} messages restants`
+      : null
+
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Header avec statut d'abonnement */}
+      <div className="shrink-0 px-4 mb-4">
+        {/* Erreur de chargement du statut */}
+        {statusError && (
+          <div className="mb-3 flex items-center gap-2 px-3 py-2 rounded-lg text-xs"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--yellow) 10%, transparent)',
+              color: 'var(--yellow)',
+              border: '1px solid color-mix(in srgb, var(--yellow) 30%, transparent)',
+            }}>
+            <span>{statusError}</span>
+            <button
+              onClick={() => setStatusError(null)}
+              className="ml-auto underline hover:no-underline"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
+        {/* Badge plan + quota */}
+        {loadingStatus ? (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full">
+            <div
+              className="w-20 h-3 rounded animate-pulse"
+              style={{ backgroundColor: 'var(--border)' }}
+            />
+          </div>
+        ) : planLabel && remainingLabel ? (
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{
+              backgroundColor: 'var(--accent-light)',
+              color: 'var(--accent)',
+              border: '1px solid color-mix(in srgb, var(--accent) 20%, transparent)',
+            }}>
+            <span>{planLabel}</span>
+            <span style={{ color: 'var(--text-3)' }}>·</span>
+            <span>{remainingLabel}</span>
+          </div>
+        ) : null}
+      </div>
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +202,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={isLimitReached}
         />
       </div>
     </div>
