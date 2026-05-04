@@ -1,41 +1,61 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    id: 'start',
+    name: 'Start',
+    price: '10 €',
     period: 'mois',
     description: 'Pour découvrir Emind sans engagement.',
     features: [
-      { text: '100 questions / mois', included: true },
+      { text: '10 questions / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Commencer avec Start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    id: 'scale',
+    name: 'Scale',
+    price: '39 €',
     period: 'mois',
     description: 'Pour les professionnels qui vivent dans leurs emails.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '50 questions / mois', included: true },
+      { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: false },
+    ],
+    cta: 'Passer à Scale',
+    highlighted: true,
+    badge: 'Recommandé',
+  },
+  {
+    id: 'team',
+    name: 'Team',
+    price: '79 €',
+    period: 'mois',
+    description: 'Pour les équipes qui veulent aller plus loin.',
+    features: [
+      { text: '100 questions / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +73,35 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingPlan, setLoadingPlan] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCheckout(planId: string) {
+    setLoadingPlan(planId)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) {
+        window.location.href = url
+      } else {
+        throw new Error('URL de paiement non reçue')
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+    } finally {
+      setLoadingPlan(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,9 +151,20 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à un plan supérieur quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mb-6 p-3 rounded-lg text-sm text-center" style={{
+            backgroundColor: 'color-mix(in srgb, var(--red) 8%, transparent)',
+            border: '1px solid color-mix(in srgb, var(--red) 20%, transparent)',
+            color: 'var(--red)',
+          }}>
+            {error}
+          </div>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -112,11 +172,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.id}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +194,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted plan */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -243,6 +303,8 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                disabled={loadingPlan !== null}
+                onClick={() => handleCheckout(plan.id)}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -269,7 +331,17 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingPlan === plan.id ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" viewBox="0 0 24 24" fill="none">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                    </svg>
+                    Redirection...
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}
