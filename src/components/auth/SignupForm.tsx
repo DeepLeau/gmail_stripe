@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,14 +19,25 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
+export function SignupForm({ pendingSessionId }: { pendingSessionId?: string }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [linkingSuccess, setLinkingSuccess] = useState(false)
 
-  const isLoading = state.status === 'loading'
+  // Récupère session_id depuis l'URL si non passé en props
+  const sessionId = pendingSessionId ?? searchParams.get('session_id') ?? undefined
+
+  // Utilise le hook canonique pour l'orchestration signup + linking
+  const { status: hookStatus, errorMessage: hookErrorMessage, signup } = useSignupWithStripeLinking({
+    pendingSessionId: sessionId,
+    redirectTo: '/chat',
+  })
+
+  const isLoading = state.status === 'loading' || hookStatus === 'signing_up' || hookStatus === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -71,30 +83,35 @@ export function SignupForm() {
 
     setState({ status: 'loading' })
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
-      return
+    // MODE 1 : email + password simple via le hook canonique
+    const result = await signup(email, password)
+
+    if (result.ok) {
+      // Le hook a déjà géré le linking Stripe et la redirection
+      // On affiche le badge de succès si un session_id était présent
+      if (sessionId) {
+        setLinkingSuccess(true)
+      }
     }
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Badge de confirmation si le linkage Stripe a réussi */}
+      {linkingSuccess && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm bg-green-50 text-green-700 border border-green-200">
+          <span className="text-green-600">✓</span>
+          <span>Plan activé — vous êtes prêt !</span>
+        </div>
+      )}
+
+      {/* Message d'erreur du hook (linking échoué, etc.) */}
+      {hookStatus === 'error' && hookErrorMessage && (
+        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+          {hookErrorMessage}
+        </p>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -197,7 +214,9 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>
+              {hookStatus === 'linking' ? 'Activation du plan...' : 'Création en cours...'}
+            </span>
           </>
         ) : (
           <span>Créer un compte</span>

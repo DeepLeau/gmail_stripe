@@ -1,17 +1,38 @@
 'use client'
 
-import { useState, useRef, useEffect, type FormEvent } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendChatMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { QuotaDisplay } from './QuotaDisplay'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
 export function ChatInterface() {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [subscription, setSubscription] = useState<SubscriptionData | null>(null)
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Fetch quota au montage
+  useEffect(() => {
+    async function fetchQuota() {
+      try {
+        const res = await fetch('/api/subscription', { cache: 'no-store' })
+        if (res.ok) {
+          const data: SubscriptionData = await res.json()
+          setSubscription(data)
+          setLimitReached(data.units_remaining === 0)
+        }
+      } catch {
+        // Silencieux — le chat reste fonctionnel sans quota display
+      }
+    }
+    fetchQuota()
+  }, [])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -22,11 +43,11 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
-  const handleSubmit = async (e?: FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -38,19 +59,39 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API vers /api/chat/send
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendChatMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
-      // Erreur silencieuse — could add error state here
+
+      // Met à jour le quota après chaque message envoyé
+      if (subscription) {
+        setSubscription((prev) =>
+          prev
+            ? {
+                ...prev,
+                units_used: prev.units_used + 1,
+                units_remaining:
+                  prev.units_remaining !== null ? Math.max(0, prev.units_remaining - 1) : null,
+              }
+            : null
+        )
+      }
+    } catch (err) {
+      if (err instanceof Error && err.message === 'limit_reached') {
+        setLimitReached(true)
+        // Met à jour le quota localement pour refléter 0 remaining
+        setSubscription((prev) =>
+          prev ? { ...prev, units_remaining: 0 } : null
+        )
+      }
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +99,20 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Header avec QuotaDisplay */}
+      {subscription && (
+        <div className="shrink-0 mb-4">
+          <QuotaDisplay subscription={subscription} />
+        </div>
+      )}
+
+      {/* Limite atteinte */}
+      {limitReached && (
+        <div className="shrink-0 mb-4 mx-4 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-sm text-amber-800">
+          <strong>Limite atteinte</strong> — Vous avez utilisé tous vos messages du mois. Passez à un plan supérieur pour continuer.
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +157,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          disabled={limitReached}
         />
       </div>
     </div>
