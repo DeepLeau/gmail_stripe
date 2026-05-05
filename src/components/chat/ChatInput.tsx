@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useCallback, useState, useEffect, type ChangeEvent, type KeyboardEvent } from 'react'
+import { useRef, useCallback, useState, type ChangeEvent, type KeyboardEvent } from 'react'
 import { Send } from 'lucide-react'
 import Link from 'next/link'
 
@@ -17,16 +17,18 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const [isAtLimit, setIsAtLimit] = useState(false)
 
-  // Sync at-limit state when remaining changes — useEffect to avoid render side-effects
-  useEffect(() => {
-    const newIsAtLimit = remaining !== null && remaining !== undefined && remaining <= 0
-    if (newIsAtLimit !== isAtLimit) {
-      setIsAtLimit(newIsAtLimit)
-      if (newIsAtLimit) {
-        onLimitReached?.()
-      }
-    }
-  }, [remaining, isAtLimit, onLimitReached])
+  const handleAtLimit = useCallback(() => {
+    setIsAtLimit(true)
+    onLimitReached?.()
+  }, [onLimitReached])
+
+  // Sync at-limit state when remaining changes
+  if (remaining !== null && remaining !== undefined && remaining <= 0 && !isAtLimit) {
+    handleAtLimit()
+  }
+  if ((remaining === null || remaining === undefined || remaining > 0) && isAtLimit) {
+    setIsAtLimit(false)
+  }
 
   const isDisabled = isLoading || !value.trim() || isAtLimit
 
