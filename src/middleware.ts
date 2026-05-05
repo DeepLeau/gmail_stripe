@@ -1,6 +1,28 @@
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+/**
+ * SECURITY_GAP EVALUATION — /chat access control
+ *
+ * Decision: subscription_status is NOT enforced at the middleware layer.
+ *
+ * Rationale:
+ *   - Users without an active row in user_subscriptions are NOT blocked from /chat.
+ *     Instead, their quota is 0 (no Free plan is implied). The quota check lives
+ *     exclusively in GET /api/messages/usage, which returns 429 when remaining === 0.
+ *   - Enforcing subscription_status in middleware would require an extra DB read on
+ *     every protected request, adding latency and coupling the auth layer to the
+ *     billing schema. The current separation of concerns (auth in middleware, quota in
+ *     route handler) is simpler and sufficient.
+ *   - Blocking users at the middleware level based on subscription_status would also
+ *     complicate the guest checkout flow (user reaches /chat before Stripe webhook has
+ *     populated user_subscriptions).
+ *
+ * Future hardening: if the threat model requires stronger guarantees (e.g., preventing
+ * unauthenticated access to chat infrastructure), consider adding subscription_status
+ * validation here using a cached / short-lived check, or moving the quota gate to a
+ * middleware-level token validation.
+ */
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 

@@ -7,10 +7,16 @@ import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan: string | null
+  remaining: number
+}
+
+export function ChatInterface({ plan, remaining }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -21,6 +27,17 @@ export function ChatInterface() {
       })
     }
   }, [messages.length])
+
+  // Au mount, si remaining <= 0, déclencher immédiatement la limite
+  useEffect(() => {
+    if (remaining <= 0) {
+      setLimitReached(true)
+    }
+  }, [remaining])
+
+  const handleLimitReached = () => {
+    setLimitReached(true)
+  }
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -58,6 +75,26 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Bannière limite atteinte */}
+      {limitReached && (
+        <div className="mb-4 flex items-center gap-2 px-4 py-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-sm">
+          <svg
+            className="w-4 h-4 shrink-0 text-amber-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={2}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"
+            />
+          </svg>
+          Limite atteinte — Passez au plan supérieur pour continuer à discuter.
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -101,7 +138,10 @@ export function ChatInterface() {
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
+          onLimitReached={handleLimitReached}
+          remaining={remaining}
           isLoading={isLoading}
+          disabled={limitReached}
         />
       </div>
     </div>
