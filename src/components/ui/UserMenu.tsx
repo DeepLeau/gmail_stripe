@@ -10,9 +10,9 @@ type UserMenuProps = {
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
-  growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
-  pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  start: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Start' },
+  scale: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Scale' },
+  team: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Team' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {

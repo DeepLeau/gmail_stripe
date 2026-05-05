@@ -5,9 +5,12 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   const PROTECTED_PREFIXES = ['/chat']
-  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
+  const PUBLIC_PREFIXES = ['/signup']
 
-  if (!isProtected) {
+  const isProtected = PROTECTED_PREFIXES.some((p) => pathname.startsWith(p))
+  const isPublic = PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))
+
+  if (!isProtected || isPublic) {
     return NextResponse.next({ request })
   }
 
