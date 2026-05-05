@@ -6,6 +6,7 @@
  * jamais continuer silencieusement sans Supabase.
  */
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 
 export async function createClient() {
@@ -42,4 +43,30 @@ export async function createClient() {
       },
     }
   )
+}
+
+/**
+ * Creates a Supabase client with the service_role key for privileged operations
+ * (webhooks, server actions that bypass RLS, DB migrations, etc.).
+ *
+ * ⚠️  This client bypasses RLS — use ONLY in trusted server-side contexts
+ * (Route Handlers, Server Actions). Never expose the service_role key to the client.
+ */
+export function createServerClientWithServiceRole() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error(
+      'Missing Supabase service role credentials. ' +
+        'Ensure NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are set.'
+    )
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  })
 }
