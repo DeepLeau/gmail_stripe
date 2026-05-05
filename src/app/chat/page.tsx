@@ -1,6 +1,14 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { getCurrentSubscription } from '@/app/actions/subscription'
 
-export default function ChatPage() {
+export default async function ChatPage() {
+  const subscriptionState = await getCurrentSubscription()
+
+  const remaining =
+    subscriptionState?.units_limit !== null && subscriptionState?.units_limit !== undefined
+      ? Math.max(0, subscriptionState.units_limit - subscriptionState.units_used)
+      : null
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -13,7 +21,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface remaining={remaining} />
         </div>
       </div>
     </main>

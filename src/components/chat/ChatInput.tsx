@@ -107,6 +107,14 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
         </button>
       </form>
 
+      {/* Remaining badge — shown when remaining > 0 */}
+      {remaining !== null && remaining !== undefined && remaining > 0 && (
+        <p className="text-xs text-gray-500 text-center">
+          {remaining} messages restants
+        </p>
+      )}
+
+      {/* At-limit banner */}
       {isAtLimit && (
         <div className="flex items-center justify-between gap-3 px-3 py-2 rounded-xl bg-red-50 border border-red-200">
           <p className="text-xs text-red-600 font-medium">
