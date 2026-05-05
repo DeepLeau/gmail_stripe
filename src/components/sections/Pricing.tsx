@@ -2,16 +2,18 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
+import { useState } from 'react'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    slug: 'start',
+    name: 'Start',
+    price: '10',
     period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
+    description: 'Pour découvrir Emind et automatiser vos réponses email.',
     features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
+      { text: '10 questions / mois', included: true },
+      { text: '1 boîte email connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
@@ -21,21 +23,39 @@ const plans = [
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    slug: 'scale',
+    name: 'Scale',
+    price: '39',
     period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
+    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
     features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
+      { text: '50 questions / mois', included: true },
+      { text: 'Boîtes email multiples', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
+    cta: 'Passer à Scale',
     highlighted: true,
     badge: 'Recommandé',
+  },
+  {
+    slug: 'team',
+    name: 'Team',
+    price: '79',
+    period: 'mois',
+    description: 'Pour les équipes qui ont besoin de plus de puissance.',
+    features: [
+      { text: '100 questions / mois', included: true },
+      { text: 'Boîtes email illimitées', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: true },
+    ],
+    cta: 'Passer à Team',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +73,30 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleCheckout(slug: string) {
+    setLoadingSlug(slug)
+    setError(null)
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: slug }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Une erreur est survenue')
+      setLoadingSlug(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,9 +146,13 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Start, Scale ou Team quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
+
+        {error && (
+          <p className="text-center text-sm text-[var(--red)] mb-6">{error}</p>
+        )}
 
         {/* Cards */}
         <motion.div
@@ -112,7 +160,7 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
           {plans.map((plan, i) => (
             <motion.div
@@ -134,7 +182,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for Scale */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -186,7 +234,7 @@ export function Pricing() {
                     className="text-sm"
                     style={{ color: 'var(--text-3)' }}
                   >
-                    / {plan.period}
+                    € / {plan.period}
                   </span>
                 </div>
               </div>
@@ -243,6 +291,8 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                onClick={() => handleCheckout(plan.slug)}
+                disabled={loadingSlug !== null}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -269,7 +319,7 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingSlug === plan.slug ? 'Chargement...' : plan.cta}
               </button>
             </motion.div>
           ))}

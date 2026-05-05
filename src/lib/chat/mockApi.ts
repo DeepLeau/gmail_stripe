@@ -1,3 +1,5 @@
+// Deprecated: utiliser POST /api/chat à la place.
+
 import { MOCK_RESPONSES, MOCK_RESPONSES_COUNT } from './responses'
 
 /**
@@ -54,7 +56,7 @@ export interface ChatResponse {
 /**
  * API-compatible chat message sender.
  * Calls the real /api/chat/send endpoint.
- * 
+ *
  * @param content - The user's message content
  * @param _userId - User ID (kept for API compatibility, not used in mock)
  * @returns Promise resolving to ChatResponse with AI text and units_used
