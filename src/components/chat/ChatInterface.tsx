@@ -2,16 +2,41 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendChatMessage } from '@/lib/api/chat'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface SubscriptionState {
+  plan: string | null
+  units_limit: number | null
+  units_used: number
+}
+
+interface ChatInterfaceProps {
+  subscription: SubscriptionState | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const remaining =
+    subscription?.units_limit !== null && subscription?.units_limit !== undefined
+      ? Math.max(0, subscription.units_limit - subscription.units_used)
+      : null
+
+  // Sync at-limit state when subscription changes
+  useEffect(() => {
+    if (remaining !== null && remaining <= 0) {
+      setLimitReached(true)
+    } else {
+      setLimitReached(false)
+    }
+  }, [remaining])
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -26,7 +51,7 @@ export function ChatInterface() {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || limitReached) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -38,19 +63,22 @@ export function ChatInterface() {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
 
-    // Appel API
+    // Appel API réelle avec gestion du quota
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendChatMessage(trimmed)
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
-      // Erreur silencieuse — could add error state here
+    } catch (err) {
+      if (err instanceof Error && err.message === 'limit_reached') {
+        setLimitReached(true)
+      }
     } finally {
       setIsLoading(false)
     }
@@ -58,6 +86,23 @@ export function ChatInterface() {
 
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Indicateur quota messages */}
+      {remaining !== null && (
+        <div className="shrink-0 flex items-center justify-center py-2 mb-2">
+          <span
+            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
+              remaining <= 0
+                ? 'bg-red-100 text-red-700'
+                : 'bg-blue-50 text-blue-700'
+            }`}
+          >
+            {remaining <= 0
+              ? 'Limite atteinte — passez au plan supérieur'
+              : `${remaining} message${remaining === 1 ? '' : 's'} restant${remaining === 1 ? '' : 's'} ce mois`}
+          </span>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -102,6 +147,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
+          onLimitReached={() => setLimitReached(true)}
         />
       </div>
     </div>
