@@ -1,12 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { linkStripeSessionToUser } from '@/app/actions/subscription'
 
 type SignupFormState = {
-  status: 'idle' | 'loading' | 'error' | 'password_mismatch'
+  status: 'idle' | 'loading' | 'linking' | 'error' | 'password_mismatch'
   errorMessage?: string
   fieldErrors?: {
     email?: string
@@ -20,18 +22,38 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const pendingSessionId = searchParams.get('session_id') ?? undefined
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [linkingSuccess, setLinkingSuccess] = useState(false)
 
-  const isLoading = state.status === 'loading'
+  const linkingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const isLoading = state.status === 'loading' || state.status === 'linking'
+
+  // Nettoyage du timeout si le composant unmount
+  useEffect(() => {
+    return () => {
+      if (linkingTimeoutRef.current) clearTimeout(linkingTimeoutRef.current)
+    }
+  }, [])
+
+  // Si linking a réussi → redirect
+  useEffect(() => {
+    if (linkingSuccess) {
+      router.push('/chat')
+    }
+  }, [linkingSuccess, router])
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -90,11 +112,83 @@ export function SignupForm() {
       return
     }
 
-    router.push('/chat')
+    // Pas de session Stripe en attente → redirect normal
+    if (!pendingSessionId) {
+      router.push('/chat')
+      return
+    }
+
+    // Session Stripe en attente → orchestrer le linking
+    setState({ status: 'linking', errorMessage: "Activation de votre abonnement…" })
+
+    // Démarrer le timeout de 30s pour le linking
+    linkingTimeoutRef.current = setTimeout(() => {
+      // Timeout atteint : on redirige quand même avec un message d'avertissement
+      setLinkingSuccess(true)
+    }, 30000)
+
+    try {
+      const result = await linkStripeSessionToUser(pendingSessionId)
+      if (linkingTimeoutRef.current) {
+        clearTimeout(linkingTimeoutRef.current)
+        linkingTimeoutRef.current = null
+      }
+
+      if (result.success) {
+        setLinkingSuccess(true)
+      } else {
+        // Linking échoué → message d'erreur, l'user reste sur la page
+        const linkErrorMsg = result.error ?? "Impossible d'activer votre abonnement. Il sera actif sous quelques instants."
+        setState({ status: 'error', errorMessage: linkErrorMsg })
+        // Redirection aussi, mais avec le message d'erreur
+        setTimeout(() => {
+          router.push('/chat')
+        }, 2500)
+      }
+    } catch {
+      if (linkingTimeoutRef.current) {
+        clearTimeout(linkingTimeoutRef.current)
+        linkingTimeoutRef.current = null
+      }
+      setState({ status: 'error', errorMessage: "Une erreur est survenue. Votre abonnement sera actif sous quelques instants." })
+      setTimeout(() => {
+        router.push('/chat')
+      }, 2500)
+    }
   }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* État linking : bannière d'avertissement */}
+      {state.status === 'linking' && (
+        <div className="flex items-center gap-3 py-3 px-4 rounded-lg text-sm"
+          style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#92400e',
+          }}>
+          <Loader2 size={15} className="animate-spin shrink-0" />
+          <span>{state.errorMessage}</span>
+        </div>
+      )}
+
+      {/* État post-linking : toast warning */}
+      {state.status === 'error' && state.errorMessage?.includes('quelques instants') && (
+        <div className="flex items-center gap-3 py-3 px-4 rounded-lg text-sm"
+          style={{
+            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#92400e',
+          }}>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="shrink-0">
+            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+            <line x1="12" y1="9" x2="12" y2="13" />
+            <line x1="12" y1="17" x2="12.01" y2="17" />
+          </svg>
+          <span>{state.errorMessage}</span>
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -178,8 +272,8 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
+      {/* Message d'erreur global (hors linking) */}
+      {state.status === 'error' && !state.errorMessage?.includes('quelques instants') && !state.fieldErrors?.confirmPassword && state.errorMessage && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
           {state.errorMessage}
         </p>
@@ -197,7 +291,7 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>{state.status === 'linking' ? "Activation en cours…" : "Création en cours…"}</span>
           </>
         ) : (
           <span>Créer un compte</span>

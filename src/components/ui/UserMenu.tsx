@@ -9,10 +9,12 @@ type UserMenuProps = {
   plan?: string | null
 }
 
+// Mise à jour des couleurs de badge selon les plans canoniques du template :
+// start → bleu, scale → violet, team → jaune/orange
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
-  growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
-  pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  start: { bg: 'bg-blue-500', text: 'text-white', label: 'Start' },
+  scale: { bg: 'bg-violet-500', text: 'text-white', label: 'Scale' },
+  team: { bg: 'bg-amber-500', text: 'text-white', label: 'Team' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
@@ -23,7 +25,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
+  // Badge style — cherche le plan dans la map (case-insensitive)
   const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
 
   // Fermeture clic extérieur + Escape
