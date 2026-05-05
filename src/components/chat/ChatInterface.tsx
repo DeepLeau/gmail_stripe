@@ -2,16 +2,33 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import { sendChatMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import type { SubscriptionData } from '@/lib/stripe/config'
+import { UNIT_LABEL } from '@/lib/stripe/config'
+import { AlertCircle } from 'lucide-react'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [showLimitBanner, setShowLimitBanner] = useState(false)
+  const [limitReached, setLimitReached] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const unitsUsed = subscription?.units_used ?? 0
+  const unitsLimit = subscription?.units_limit ?? null
+  const unitsRemaining = subscription?.units_remaining ?? null
+  const isPaidPlan = subscription?.status === 'active' && unitsLimit !== null
+  const planLabel = subscription?.plan
+    ? subscription.plan.charAt(0).toUpperCase() + subscription.plan.slice(1)
+    : null
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -28,6 +45,11 @@ export function ChatInterface() {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
+    if (limitReached) {
+      setShowLimitBanner(true)
+      return
+    }
+
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -37,27 +59,90 @@ export function ChatInterface() {
     }
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
+    setShowLimitBanner(false)
 
     // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendChatMessage(trimmed)
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
-    } catch {
-      // Erreur silencieuse — could add error state here
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : ''
+      if (msg === 'limit_reached') {
+        setLimitReached(true)
+        setShowLimitBanner(true)
+      }
     } finally {
       setIsLoading(false)
     }
   }
 
+  const handleLimitReached = () => {
+    setLimitReached(true)
+  }
+
   return (
     <div className="flex flex-col h-full py-6">
+      {/* Header plan + quota */}
+      {isPaidPlan && unitsRemaining !== null && (
+        <div className="mb-4 flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--surface)] border border-[var(--border)]">
+          <div className="flex items-center gap-2">
+            {planLabel && (
+              <span
+                className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider"
+                style={{
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent)',
+                }}
+              >
+                {planLabel}
+              </span>
+            )}
+            <span className="text-xs text-[var(--text-2)]">
+              {unitsRemaining} {UNIT_LABEL}{unitsRemaining !== 1 ? 's' : ''} restants
+            </span>
+          </div>
+          {unitsRemaining <= 5 && unitsRemaining > 0 && (
+            <span className="text-[10px] text-amber-600 font-medium">
+              Plus que {unitsRemaining}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Bannière quota atteint */}
+      {(limitReached || unitsRemaining === 0) && (
+        <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+          <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" strokeWidth={2} />
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-amber-800">
+              Limite de {UNIT_LABEL.toLowerCase()}s atteinte
+            </p>
+            <p className="text-xs text-amber-600 mt-0.5">
+              Mets à niveau ton plan pour continuer à poser des questions à tes emails.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Bannière d'avertissement dismissible */}
+      {showLimitBanner && !limitReached && unitsRemaining !== null && unitsRemaining > 0 && (
+        <div className="mb-4 flex items-start gap-3 px-4 py-3 rounded-xl bg-amber-50 border border-amber-200">
+          <AlertCircle size={16} className="text-amber-600 mt-0.5 flex-shrink-0" strokeWidth={2} />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-amber-800">
+              Plus que {unitsRemaining} {UNIT_LABEL.toLowerCase()}{unitsRemaining !== 1 ? 's' : ''} ce mois-ci
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Zone des messages */}
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
@@ -83,6 +168,12 @@ export function ChatInterface() {
             <p className="text-xs text-gray-500 max-w-xs">
               Dicte une question en langage naturel. L&apos;IA explore tes emails et te répond.
             </p>
+            {/* Indicateur quota pour les plans payants */}
+            {isPaidPlan && unitsRemaining !== null && (
+              <p className="text-xs text-gray-400 mt-2">
+                {unitsRemaining} {UNIT_LABEL.toLowerCase()}{unitsRemaining !== 1 ? 's' : ''} restants ce mois-ci
+              </p>
+            )}
           </div>
         )}
 
@@ -102,6 +193,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={limitReached ? 0 : unitsRemaining}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>
