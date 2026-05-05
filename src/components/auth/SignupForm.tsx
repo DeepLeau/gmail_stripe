@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -20,18 +20,35 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const sessionId = searchParams.get('session_id') ?? undefined
+
+  const {
+    status: hookStatus,
+    errorMessage: hookError,
+    signup,
+  } = useSignupWithStripeLinking({
+    pendingSessionId: sessionId,
+    redirectTo: '/chat',
+  })
+
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading =
+    hookStatus === 'signing_up' ||
+    hookStatus === 'linking' ||
+    state.status === 'loading'
+
+  const isProcessingSubscription = hookStatus === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -69,28 +86,20 @@ export function SignupForm() {
 
     if (!validate()) return
 
+    // Afficher un état de traitement pour lelinking Stripe
     setState({ status: 'loading' })
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+    const result = await signup(email.trim(), password)
+
+    if (!result.ok) {
+      setState({
+        status: 'error',
+        errorMessage: result.error ?? 'Une erreur est survenue',
+      })
       return
     }
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
+    // Redirection gérée par le hook via router.push
   }
 
   return (
@@ -178,11 +187,20 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
+      {/* Message d'erreur global (incluant hook) */}
+      {(state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage) ||
+      (hookStatus === 'error' && hookError) ? (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
+          {state.errorMessage ?? hookError}
         </p>
+      ) : null}
+
+      {/* État de traitement Stripe */}
+      {isProcessingSubscription && (
+        <div className="flex items-center justify-center gap-2 py-2 text-sm text-[var(--text-2)]">
+          <Loader2 size={14} className="animate-spin shrink-0" />
+          <span>Création de votre abonnement…</span>
+        </div>
       )}
 
       {/* Bouton submit */}
@@ -197,7 +215,7 @@ export function SignupForm() {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>Création en cours...</span>
+            <span>{isProcessingSubscription ? 'Création de votre abonnement…' : 'Création en cours…'}</span>
           </>
         ) : (
           <span>Créer un compte</span>
