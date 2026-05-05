@@ -26,13 +26,9 @@ export type TrustItem = {
 }
 
 export type Plan = {
-  slug: string
   name: string
-  price: number
-  interval: string
+  price: string
   description: string
-  unitLabel: string
-  unitLimit: number
   features: string[]
   cta: string
   highlighted: boolean
@@ -56,7 +52,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Comment fonctionne la tarification ?",
     answer:
-      "Nous proposons trois plans : Start à 10 €/mois (10 questions), Scale à 39 €/mois (50 questions), et Team à 79 €/mois (100 questions). Aucune surprise — les prix sont transparents dès la page d'accueil.",
+      "Nous proposons deux plans : un plan gratuit limité à 100 questions/mois et 1 boîte mail, et un plan Pro illimité avec plusieurs boîtes mail et une priorité de traitement. Aucune surprise — les prix sont transparents dès la page d'accueil.",
   },
   {
     question: "Mes données email sont-elles en sécurité ?",
@@ -66,7 +62,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Puis-je connecter plusieurs boîtes email ?",
     answer:
-      "Le plan Start autorise 1 boîte mail. Les plans Scale et Team permettent de connecter plusieurs boîtes — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
+      "Le plan gratuit autorise 1 boîte mail. Le plan Pro permet de connecter autant de boîtes que vous le souhaitez — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
   },
   {
     question: "L'IA peut-elle répondre à mes clients à ma place ?",
@@ -162,56 +158,31 @@ export const trustItems: TrustItem[] = [
 
 export const plans: Plan[] = [
   {
-    slug: 'start',
-    name: 'Start',
-    price: 10,
-    interval: 'month',
-    unitLabel: 'messages',
-    unitLimit: 10,
-    description: 'Pour découvrir Emind et automatiser vos réponses email.',
+    name: "Free",
+    price: "0",
+    description: "Pour découvrir Emind et automiser vos réponses email.",
     features: [
-      '10 questions / mois',
-      '1 boîte email connectée',
-      'Réponses en 10 secondes',
-      'Support par email',
+      "100 questions/mois",
+      "1 boîte email connectée",
+      "Réponses en 10 secondes",
+      "Support par email",
     ],
-    cta: 'Commencer gratuitement',
+    cta: "Commencer gratuitement",
     highlighted: false,
   },
   {
-    slug: 'scale',
-    name: 'Scale',
-    price: 39,
-    interval: 'month',
-    unitLabel: 'messages',
-    unitLimit: 50,
-    description: 'Pour les professionnels qui gèrent plusieurs boîtes email.',
+    name: "Pro",
+    price: "29",
+    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
     features: [
-      '50 questions / mois',
-      'Boîtes email multiples',
-      'Réponses en 5 secondes',
-      'Support prioritaire',
+      "Questions illimitées",
+      "Boîtes email illimitées",
+      "Priorité de traitement",
+      "Réponses en 3 secondes",
+      "Support prioritaire",
     ],
-    cta: 'Passer à Scale',
+    cta: "Passer Pro",
     highlighted: true,
-  },
-  {
-    slug: 'team',
-    name: 'Team',
-    price: 79,
-    interval: 'month',
-    unitLabel: 'messages',
-    unitLimit: 100,
-    description: 'Pour les équipes qui ont besoin de plus de puissance.',
-    features: [
-      '100 questions / mois',
-      'Boîtes email illimitées',
-      'Réponses en 3 secondes',
-      'Support prioritaire',
-      'Multi-comptes',
-    ],
-    cta: 'Passer à Team',
-    highlighted: false,
   },
 ]
 

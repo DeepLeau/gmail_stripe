@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
+import { createClient } from '@/lib/supabase/client'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -17,22 +18,14 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-interface SignupFormProps {
-  pendingSessionId?: string
-}
-
-export function SignupForm({ pendingSessionId }: SignupFormProps) {
+export function SignupForm() {
+  const router = useRouter()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const { status, errorMessage, signup } = useSignupWithStripeLinking({
-    pendingSessionId,
-    redirectTo: '/chat',
-  })
-
-  const isLoading = status === 'signing_up' || status === 'linking' || state.status === 'loading'
+  const isLoading = state.status === 'loading'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
@@ -47,6 +40,12 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
       fieldErrors.password = 'Le mot de passe est requis'
     } else if (password.length < MIN_PASSWORD_LENGTH) {
       fieldErrors.password = `Le mot de passe doit contenir au moins ${MIN_PASSWORD_LENGTH} caractères`
+    }
+
+    if (password && confirmPassword && password !== confirmPassword) {
+      fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
+      setState({ status: 'password_mismatch', fieldErrors })
+      return false
     }
 
     if (!confirmPassword) {
@@ -72,22 +71,27 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
 
     setState({ status: 'loading' })
 
-    const result = await signup(email, password, {
-      userMetadata: { email: email.trim() },
+    const supabase = createClient()
+    if (!supabase) {
+      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
+      return
+    }
+
+    const { error } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
     })
 
-    if (!result.ok) {
-      setState({
-        status: 'error',
-        errorMessage: result.error ?? 'Une erreur est survenue lors de la création du compte',
-      })
+    if (error) {
+      const message = error.message === 'User already registered'
+        ? 'Un compte existe déjà avec cet email'
+        : 'Une erreur est survenue lors de la création du compte'
+      setState({ status: 'error', errorMessage: message })
+      return
     }
-  }
 
-  // Combine hook error with local form error
-  const displayError =
-    errorMessage ??
-    (state.status === 'error' && !state.fieldErrors ? state.errorMessage : undefined)
+    router.push('/chat')
+  }
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
@@ -162,18 +166,22 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
                      disabled:opacity-50 disabled:cursor-not-allowed
                      border-[var(--border-md)] focus:border-[var(--accent)]"
         />
-        {(state.status === 'error' || state.status === 'password_mismatch') &&
-          state.fieldErrors?.confirmPassword && (
-            <p className="text-xs text-[var(--red)] flex items-center gap-1">
-              {state.fieldErrors.confirmPassword}
-            </p>
-          )}
+        {state.status === 'error' && state.fieldErrors?.confirmPassword && (
+          <p className="text-xs text-[var(--red)] flex items-center gap-1">
+            {state.fieldErrors.confirmPassword}
+          </p>
+        )}
+        {state.status === 'password_mismatch' && state.fieldErrors?.confirmPassword && (
+          <p className="text-xs text-[var(--red)] flex items-center gap-1">
+            {state.fieldErrors.confirmPassword}
+          </p>
+        )}
       </div>
 
       {/* Message d'erreur global */}
-      {displayError && (
+      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {displayError}
+          {state.errorMessage}
         </p>
       )}
 
@@ -189,9 +197,7 @@ export function SignupForm({ pendingSessionId }: SignupFormProps) {
         {isLoading ? (
           <>
             <Loader2 size={15} className="animate-spin shrink-0" />
-            <span>
-              {status === 'linking' ? 'Finalisation...' : 'Création en cours...'}
-            </span>
+            <span>Création en cours...</span>
           </>
         ) : (
           <span>Créer un compte</span>
