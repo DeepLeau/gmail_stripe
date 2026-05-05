@@ -13,6 +13,11 @@ const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: strin
   starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
   growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  // Stripe plan names
+  start: { bg: 'bg-blue-100', text: 'text-blue-800', label: 'Start' },
+  scale: { bg: 'bg-purple-100', text: 'text-purple-800', label: 'Scale' },
+  team: { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Team' },
+  free: { bg: 'bg-gray-100', text: 'text-gray-600', label: 'Free' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
@@ -23,8 +28,8 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  // Badge style — null means no badge (e.g. free or unrecognized plan)
+  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] ?? null : null
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {

@@ -75,7 +75,8 @@ export function FinalCTA() {
           transition={{ duration: 0.6, delay: 0.2, ease: 'easeOut' }}
           className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
         >
-          <button
+          <a
+            href="/#pricing"
             className="h-12 px-8 rounded-full text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 w-full sm:w-auto"
             style={{
               backgroundColor: '#ffffff',
@@ -83,14 +84,14 @@ export function FinalCTA() {
               boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             }}
             onMouseEnter={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.transform =
+              ;(e.currentTarget as HTMLAnchorElement).style.transform =
                 'translateY(-2px)'
-              ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+              ;(e.currentTarget as HTMLAnchorElement).style.boxShadow =
                 '0 8px 32px rgba(0,0,0,0.2)'
             }}
             onMouseLeave={(e) => {
-              ;(e.currentTarget as HTMLButtonElement).style.transform = ''
-              ;(e.currentTarget as HTMLButtonElement).style.boxShadow =
+              ;(e.currentTarget as HTMLAnchorElement).style.transform = ''
+              ;(e.currentTarget as HTMLAnchorElement).style.boxShadow =
                 '0 4px 20px rgba(0,0,0,0.15)'
             }}
           >
@@ -107,7 +108,7 @@ export function FinalCTA() {
             >
               <path d="M3 8h10M9 4l4 4-4 4" />
             </svg>
-          </button>
+          </a>
         </motion.div>
 
         <motion.p

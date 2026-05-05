@@ -1,6 +1,24 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
+import { getCurrentSubscription } from '@/app/actions/subscription'
 
-export default function ChatPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function ChatPage() {
+  let plan = 'free'
+  let remaining = 0
+
+  try {
+    const subscription = await getCurrentSubscription()
+    if (subscription) {
+      plan = subscription.plan ?? 'free'
+      const limit = subscription.units_limit ?? 0
+      const used = subscription.units_used ?? 0
+      remaining = Math.max(0, limit - used)
+    }
+  } catch {
+    // User not authenticated or subscription fetch failed — stay on free/0
+  }
+
   return (
     <main className="flex flex-col h-screen bg-white">
       {/* Header discret */}
@@ -13,7 +31,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface remaining={remaining} plan={plan} />
         </div>
       </div>
     </main>

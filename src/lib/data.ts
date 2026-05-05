@@ -25,6 +25,7 @@ export type TrustItem = {
   icon: string
 }
 
+// @deprecated — use STRIPE_PLANS instead
 export type Plan = {
   name: string
   price: string
@@ -38,6 +39,48 @@ export type FooterLink = {
   label: string
   href: string
 }
+
+// ============================================================
+// Stripe plans — source of truth for all pricing UI
+// ============================================================
+
+export type StripePlanSlug = 'start' | 'scale' | 'team'
+
+export interface StripePlanConfig {
+  slug: StripePlanSlug
+  displayName: string
+  priceMonthly: number
+  unitLimit: number
+  unitSingular: string
+  unitPlural: string
+}
+
+export const STRIPE_PLANS: StripePlanConfig[] = [
+  {
+    slug: 'start',
+    displayName: 'Start',
+    priceMonthly: 10,
+    unitLimit: 10,
+    unitSingular: 'message',
+    unitPlural: 'messages',
+  },
+  {
+    slug: 'scale',
+    displayName: 'Scale',
+    priceMonthly: 39,
+    unitLimit: 50,
+    unitSingular: 'message',
+    unitPlural: 'messages',
+  },
+  {
+    slug: 'team',
+    displayName: 'Team',
+    priceMonthly: 79,
+    unitLimit: 100,
+    unitSingular: 'message',
+    unitPlural: 'messages',
+  },
+]
 
 // ============================================================
 // Question pairs — section "Exemples de questions"
@@ -152,10 +195,7 @@ export const trustItems: TrustItem[] = [
   },
 ]
 
-// ============================================================
-// Plans — section "Tarification"
-// ============================================================
-
+// @deprecated — replaced by STRIPE_PLANS for Stripe-integrated pricing
 export const plans: Plan[] = [
   {
     name: "Free",
