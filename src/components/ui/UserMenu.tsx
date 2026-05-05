@@ -3,16 +3,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
+import { getPlanDisplayName } from '@/lib/stripe/config'
 
 type UserMenuProps = {
   userEmail: string
   plan?: string | null
 }
 
-const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
-  growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
-  pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+const PLAN_BADGE_COLORS: Record<string, { bg: string; text: string }> = {
+  start: { bg: 'bg-blue-100', text: 'text-blue-700' },
+  scale: { bg: 'bg-purple-100', text: 'text-purple-700' },
+  team: { bg: 'bg-amber-100', text: 'text-amber-700' },
 }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
@@ -23,8 +24,9 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  // Badge style basé sur le plan Stripe
+  const badgeStyle = plan ? PLAN_BADGE_COLORS[plan.toLowerCase()] : null
+  const badgeLabel = plan ? getPlanDisplayName(plan as 'start' | 'scale' | 'team') : null
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -83,9 +85,9 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
-              {badgeStyle && (
+              {badgeStyle && badgeLabel && (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
-                  {badgeStyle.label}
+                  {badgeLabel}
                 </span>
               )}
             </div>

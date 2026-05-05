@@ -45,30 +45,30 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
-        {/* SVG noise filter */}
-        <svg className="noise-filter" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <filter id="glass-noise">
-              <feTurbulence
-                type="fractalNoise"
-                baseFrequency="0.75"
-                numOctaves="4"
-                stitchTiles="stitch"
-              />
-              <feColorMatrix type="saturate" values="0" />
-              <feBlend
-                in="SourceGraphic"
-                mode="overlay"
-                result="blend"
-              />
-              <feComposite in="blend" in2="SourceGraphic" operator="in" />
-            </filter>
-          </defs>
-        </svg>
-      </head>
-      <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
-        {children}
-      </body>
+        </head>
+        <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
+          {/* SVG noise filter — moved out of <head> (invalid HTML) to fix hydration crash */}
+          <svg className="noise-filter" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ position: 'absolute', width: 0, height: 0, overflow: 'hidden' }}>
+            <defs>
+              <filter id="glass-noise">
+                <feTurbulence
+                  type="fractalNoise"
+                  baseFrequency="0.75"
+                  numOctaves="4"
+                  stitchTiles="stitch"
+                />
+                <feColorMatrix type="saturate" values="0" />
+                <feBlend
+                  in="SourceGraphic"
+                  mode="overlay"
+                  result="blend"
+                />
+                <feComposite in="blend" in2="SourceGraphic" operator="in" />
+              </filter>
+            </defs>
+          </svg>
+          {children}
+        </body>
     </html>
   )
 }
