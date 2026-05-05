@@ -32,6 +32,8 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
 
   const isDisabled = isLoading || !value.trim() || isAtLimit
 
+  const isWarning = remaining !== null && remaining !== undefined && remaining <= 3 && remaining > 0
+
   const adjustHeight = useCallback(() => {
     const textarea = textareaRef.current
     if (!textarea) return
@@ -79,7 +81,7 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
             textareaRef.current.style.overflowY = 'hidden'
           }
         }}
-        className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm"
+        className="flex items-end gap-3 bg-white border border-gray-200 rounded-2xl px-4 py-3 shadow-sm relative"
       >
         <textarea
           ref={textareaRef}
@@ -105,6 +107,21 @@ export function ChatInput({ value, onChange, onSubmit, isLoading, remaining, onL
         >
           <Send size={15} className="text-white" strokeWidth={2} />
         </button>
+
+        {/* Badge messages restants */}
+        {remaining !== null && remaining !== undefined && (
+          <div
+            className={`absolute -top-7 right-2 px-2 py-0.5 rounded-full text-[10px] font-semibold transition-colors duration-200 ${
+              isAtLimit
+                ? 'bg-red-100 text-red-600'
+                : isWarning
+                ? 'bg-orange-100 text-orange-600'
+                : 'bg-gray-100 text-gray-500'
+            }`}
+          >
+            {remaining} message{remaining !== 1 ? 's' : ''} restant{remaining !== 1 ? 's' : ''}
+          </div>
+        )}
       </form>
 
       {isAtLimit && (

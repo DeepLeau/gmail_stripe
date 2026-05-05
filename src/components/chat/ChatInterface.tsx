@@ -2,15 +2,20 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  remaining: number
+  plan: string
+}
+
+export function ChatInterface({ remaining, plan }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [localRemaining, setLocalRemaining] = useState(remaining)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   // Scroll automatique vers le bas après chaque message
@@ -22,11 +27,20 @@ export function ChatInterface() {
     }
   }, [messages.length])
 
+  // Keep local remaining in sync when prop changes
+  useEffect(() => {
+    setLocalRemaining(remaining)
+  }, [remaining])
+
+  const handleLimitReached = () => {
+    // Visual feedback is handled by ChatInput itself via remaining prop
+  }
+
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
 
     const trimmed = inputValue.trim()
-    if (!trimmed || isLoading) return
+    if (!trimmed || isLoading || localRemaining <= 0) return
 
     // Ajout du message utilisateur
     const userMessage: ChatMessage = {
@@ -41,14 +55,35 @@ export function ChatInterface() {
     // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const res = await fetch('/api/chat/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: trimmed }),
+      })
+
+      const data = await res.json()
+
+      if (res.status === 403 && data.error === 'limit_reached') {
+        setLocalRemaining(0)
+        handleLimitReached()
+        return
+      }
+
+      if (!res.ok) {
+        throw new Error(data.error ?? 'Erreur serveur')
+      }
+
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: data.text ?? '',
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      if (typeof data.units_used === 'number') {
+        setLocalRemaining((prev) => Math.max(0, prev - 1))
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -102,6 +137,8 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={localRemaining}
+          onLimitReached={handleLimitReached}
         />
       </div>
     </div>
