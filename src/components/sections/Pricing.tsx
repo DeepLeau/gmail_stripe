@@ -2,42 +2,7 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
-
-const plans = [
-  {
-    name: 'Free',
-    price: '0 €',
-    period: 'mois',
-    description: 'Pour découvrir Emind sans engagement.',
-    features: [
-      { text: '100 questions / mois', included: true },
-      { text: '1 boîte mail connectée', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: false },
-      { text: 'Priorité de traitement', included: false },
-    ],
-    cta: 'Commencer gratuitement',
-    highlighted: false,
-  },
-  {
-    name: 'Pro',
-    price: '19 €',
-    period: 'mois',
-    description: 'Pour les professionnels qui vivent dans leurs emails.',
-    features: [
-      { text: 'Questions illimitées', included: true },
-      { text: 'Plusieurs boîtes mail', included: true },
-      { text: 'Résumés de threads', included: true },
-      { text: 'Recherche en langage naturel', included: true },
-      { text: 'Multi-comptes', included: true },
-      { text: 'Priorité de traitement', included: true },
-    ],
-    cta: 'Passer à Pro',
-    highlighted: true,
-    badge: 'Recommandé',
-  },
-]
+import { PLANS, type PlanFeature, type PlanEntry } from '@/lib/stripe/plans'
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -53,6 +18,24 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  async function handleCheckout(planId: string) {
+    try {
+      const res = await fetch('/api/stripe/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: planId }),
+      })
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        throw new Error(body.error ?? 'Erreur lors de la création du checkout')
+      }
+      const { url } = await res.json()
+      if (url) window.location.href = url
+    } catch (err) {
+      console.error('Checkout error:', err)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +85,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Start, Scale ou Team selon tes besoins.
           </motion.p>
         </div>
 
@@ -112,11 +95,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {PLANS.map((plan: PlanEntry, i: number) => (
             <motion.div
-              key={i}
+              key={plan.id}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +117,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for highlighted */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -165,7 +148,7 @@ export function Pricing() {
                   className="text-lg font-semibold tracking-tight mb-1"
                   style={{ color: 'var(--text)', letterSpacing: '-0.02em' }}
                 >
-                  {plan.name}
+                  {plan.displayName}
                 </p>
                 <p
                   className="text-sm mb-4"
@@ -178,7 +161,10 @@ export function Pricing() {
                 <div className="flex items-baseline gap-1.5 mb-4">
                   <span
                     className="text-4xl font-bold tracking-tight"
-                    style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
+                    style={{
+                      color: plan.highlighted ? 'var(--accent)' : 'var(--text)',
+                      letterSpacing: '-0.04em',
+                    }}
                   >
                     {plan.price}
                   </span>
@@ -186,7 +172,7 @@ export function Pricing() {
                     className="text-sm"
                     style={{ color: 'var(--text-3)' }}
                   >
-                    / {plan.period}
+                    / mois
                   </span>
                 </div>
               </div>
@@ -199,7 +185,7 @@ export function Pricing() {
 
               {/* Features */}
               <ul className="flex flex-col gap-3 flex-1">
-                {plan.features.map((feature, j) => (
+                {plan.features.map((feature: PlanFeature, j: number) => (
                   <li
                     key={j}
                     className="flex items-start gap-3 text-sm"
@@ -268,8 +254,9 @@ export function Pricing() {
                       'var(--text-2)'
                   }
                 }}
+                onClick={() => handleCheckout(plan.id)}
               >
-                {plan.cta}
+                {plan.highlighted ? 'Choisir ' : 'Choisir '}{plan.displayName}
               </button>
             </motion.div>
           ))}
