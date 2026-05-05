@@ -1,9 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { Loader2, Info } from 'lucide-react'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -18,20 +17,28 @@ type SignupFormState = {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 6
 
-export function SignupForm() {
-  const router = useRouter()
+interface SignupFormProps {
+  sessionId?: string
+}
+
+export function SignupForm({ sessionId }: SignupFormProps) {
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const { status, errorMessage: hookErrorMessage, signup } = useSignupWithStripeLinking({
+    pendingSessionId: sessionId,
+    redirectTo: '/chat',
+  })
+
+  const isLoading = status === 'signing_up' || status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -64,37 +71,31 @@ export function SignupForm() {
     return true
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+async function handleSubmit(e: React.FormEvent) {
+  e.preventDefault()
 
-    if (!validate()) return
+  if (!validate()) return
 
-    setState({ status: 'loading' })
-
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
-      return
-    }
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
-  }
+  await signup(email.trim(), password)
+}
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Session info banner */}
+      {sessionId && (
+        <div
+          className="flex items-start gap-2.5 px-3 py-2.5 rounded-lg text-xs"
+          style={{
+            backgroundColor: 'var(--accent-light)',
+            color: 'var(--accent)',
+            border: '1px solid rgba(59, 130, 246, 0.2)',
+          }}
+        >
+          <Info size={14} className="mt-0.5 flex-shrink-0" strokeWidth={1.5} />
+          <span>Votre plan sera activé après création de votre compte.</span>
+        </div>
+      )}
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
@@ -178,12 +179,12 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
-      {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
-        <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
-          {state.errorMessage}
-        </p>
-      )}
+{/* Message d'erreur global */}
+{(state.status === 'error' || status === 'error') && !state.fieldErrors?.confirmPassword && (state.errorMessage || hookErrorMessage) && (
+  <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
+    {state.errorMessage || hookErrorMessage}
+  </p>
+)}
 
       {/* Bouton submit */}
       <button
