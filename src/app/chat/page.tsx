@@ -1,5 +1,7 @@
 import { ChatInterface } from '@/components/chat/ChatInterface'
 
+export const dynamic = 'force-dynamic'
+
 export default function ChatPage() {
   return (
     <main className="flex flex-col h-screen bg-white">
@@ -13,7 +15,7 @@ export default function ChatPage() {
       {/* Zone de chat */}
       <div className="flex-1 overflow-hidden">
         <div className="max-w-3xl mx-auto h-full px-4">
-          <ChatInterface />
+          <ChatInterface subscription={null} />
         </div>
       </div>
     </main>
