@@ -6,12 +6,26 @@ import { sendMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
+import { decrementUnits } from '@/app/actions/subscription'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  plan?: string
+  unitsLimit?: number
+  unitsUsed?: number
+}
+
+export function ChatInterface({ plan, unitsLimit, unitsUsed }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Local remaining units tracking
+  const [remaining, setRemaining] = useState<number | undefined>(
+    unitsLimit != null && unitsUsed != null
+      ? Math.max(0, unitsLimit - unitsUsed)
+      : undefined
+  )
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -49,6 +63,14 @@ export function ChatInterface() {
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
+
+      // Decrement usage after successful AI response
+      if (remaining !== undefined) {
+        const result = await decrementUnits()
+        if (result.success) {
+          setRemaining((prev) => (prev != null ? Math.max(0, prev - 1) : prev))
+        }
+      }
     } catch {
       // Erreur silencieuse — could add error state here
     } finally {
@@ -102,6 +124,7 @@ export function ChatInterface() {
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>

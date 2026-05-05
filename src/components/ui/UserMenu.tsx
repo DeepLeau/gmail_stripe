@@ -10,10 +10,16 @@ type UserMenuProps = {
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
+  start: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Start' },
+  scale: { bg: 'bg-indigo-100', text: 'text-indigo-700', label: 'Scale' },
+  team: { bg: 'bg-amber-100', text: 'text-amber-700', label: 'Team' },
+  // Legacy fallbacks for older slug names
   starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
   growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
   pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
 }
+
+const FALLBACK_STYLE = { bg: 'bg-gray-100', text: 'text-gray-600', label: '' }
 
 export function UserMenu({ userEmail, plan }: UserMenuProps) {
   const [open, setOpen] = useState(false)
@@ -23,8 +29,8 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
   // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  // Badge style — fallback to null for unknown slugs
+  const badgeStyle = plan ? (PLAN_BADGE_STYLES[plan.toLowerCase()] ?? FALLBACK_STYLE) : null
 
   // Fermeture clic extérieur + Escape
   useEffect(() => {
@@ -83,7 +89,7 @@ export function UserMenu({ userEmail, plan }: UserMenuProps) {
             <p className="text-xs text-[var(--text-3)] mb-0.5">Connecté en tant que</p>
             <div className="flex items-center gap-2">
               <p className="text-sm text-[var(--text)] font-medium truncate">{userEmail}</p>
-              {badgeStyle && (
+              {badgeStyle && badgeStyle.label && (
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${badgeStyle.bg} ${badgeStyle.text}`}>
                   {badgeStyle.label}
                 </span>

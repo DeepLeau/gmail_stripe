@@ -52,7 +52,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Comment fonctionne la tarification ?",
     answer:
-      "Nous proposons deux plans : un plan gratuit limité à 100 questions/mois et 1 boîte mail, et un plan Pro illimité avec plusieurs boîtes mail et une priorité de traitement. Aucune surprise — les prix sont transparents dès la page d'accueil.",
+      "Nous proposons trois plans : Start (10€/mois, 10 messages), Scale (39€/mois, 50 messages) et Team (79€/mois, 100 messages). Aucun engagement — les prix sont transparents dès la page d'accueil.",
   },
   {
     question: "Mes données email sont-elles en sécurité ?",
@@ -62,7 +62,7 @@ export const questionPairs: QuestionPair[] = [
   {
     question: "Puis-je connecter plusieurs boîtes email ?",
     answer:
-      "Le plan gratuit autorise 1 boîte mail. Le plan Pro permet de connecter autant de boîtes que vous le souhaitez — idéal pour les petites équipes qui gèrent plusieurs adresses professionnel@ et contact@.",
+      "Tous les plans supportent plusieurs boîtes mail. Le nombre dépend de votre plan : Start permet 1 boîte, Scale et Team offrent une gestion multi-comptes idéale pour les petites équipes.",
   },
   {
     question: "L'IA peut-elle répondre à mes clients à ma place ?",
@@ -158,31 +158,43 @@ export const trustItems: TrustItem[] = [
 
 export const plans: Plan[] = [
   {
-    name: "Free",
-    price: "0",
-    description: "Pour découvrir Emind et automiser vos réponses email.",
+    name: "Start",
+    price: "10",
+    description: "Pour démarrer avec Emind et découvrir les réponses intelligentes.",
     features: [
-      "100 questions/mois",
+      "10 messages/mois",
       "1 boîte email connectée",
       "Réponses en 10 secondes",
       "Support par email",
     ],
-    cta: "Commencer gratuitement",
+    cta: "Commencer avec Start",
     highlighted: false,
   },
   {
-    name: "Pro",
-    price: "29",
-    description: "Pour les professionals qui gèrent plusieurs boîtes email.",
+    name: "Scale",
+    price: "39",
+    description: "Pour les professionnels qui gèrent plus de volumes et plusieurs boîtes email.",
     features: [
-      "Questions illimitées",
-      "Boîtes email illimitées",
-      "Priorité de traitement",
-      "Réponses en 3 secondes",
+      "50 messages/mois",
+      "Boîtes email multiples",
+      "Réponses en 5 secondes",
       "Support prioritaire",
     ],
-    cta: "Passer Pro",
+    cta: "Passer à Scale",
     highlighted: true,
+  },
+  {
+    name: "Team",
+    price: "79",
+    description: "Pour les équipes qui ont besoin de plus et veulent travailler en collaboration.",
+    features: [
+      "100 messages/mois",
+      "Boîtes email illimitées",
+      "Réponses en 3 secondes",
+      "Support dédié",
+    ],
+    cta: "Passer à Team",
+    highlighted: false,
   },
 ]
 
@@ -204,3 +216,45 @@ export const footerLinks: FooterLink[] = [
     href: "#",
   },
 ]
+
+// ============================================================
+// Plan data helpers — delegate to canonical src/lib/plans.ts
+// ============================================================
+
+import { getAllPlans, getPlanDisplayName } from '@/lib/plans'
+
+export type PlanSlug = 'start' | 'scale' | 'team'
+
+export interface PlanData {
+  slug: PlanSlug
+  name: string
+  price: number
+  priceDisplay: string
+  unitLabel: string
+  unitLabelPlural: string
+  description: string
+}
+
+/**
+ * Returns the full plan data for a given slug.
+ * Delegates to src/lib/plans.ts which is the source of truth.
+ */
+export function getPlanBySlug(slug: string): PlanData | undefined {
+  const lower = slug.toLowerCase()
+  const allPlans = getAllPlans()
+  const matched = allPlans.find((p: ReturnType<typeof getAllPlans>[number]) => p.id === lower)
+  if (!matched) return undefined
+
+  const unitLabel = 'message'
+  const unitLabelPlural = 'messages'
+
+  return {
+    slug: lower as PlanSlug,
+    name: getPlanDisplayName(lower as PlanSlug),
+    price: matched.monthly_price_cents / 100,
+    priceDisplay: `${matched.monthly_price_cents / 100} €`,
+    unitLabel,
+    unitLabelPlural,
+    description: matched.description ?? '',
+  }
+}
