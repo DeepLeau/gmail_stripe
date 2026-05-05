@@ -1,41 +1,65 @@
 'use client'
 
+import { useState } from 'react'
 import { motion, type Variants } from 'framer-motion'
-import { Check, X } from 'lucide-react'
+import { Check, X, Loader2 } from 'lucide-react'
+import { createCheckoutSession } from '@/app/actions/stripe'
 
 const plans = [
   {
-    name: 'Free',
-    price: '0 €',
+    name: 'Start',
+    price: '10 €',
     period: 'mois',
+    limit: '10 messages / mois',
     description: 'Pour découvrir Emind sans engagement.',
     features: [
-      { text: '100 questions / mois', included: true },
+      { text: '10 messages / mois', included: true },
       { text: '1 boîte mail connectée', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: false },
       { text: 'Priorité de traitement', included: false },
     ],
-    cta: 'Commencer gratuitement',
+    cta: 'Choisir Start',
+    slug: 'start',
     highlighted: false,
   },
   {
-    name: 'Pro',
-    price: '19 €',
+    name: 'Scale',
+    price: '39 €',
     period: 'mois',
+    limit: '50 messages / mois',
     description: 'Pour les professionnels qui vivent dans leurs emails.',
     features: [
-      { text: 'Questions illimitées', included: true },
+      { text: '50 messages / mois', included: true },
       { text: 'Plusieurs boîtes mail', included: true },
       { text: 'Résumés de threads', included: true },
       { text: 'Recherche en langage naturel', included: true },
       { text: 'Multi-comptes', included: true },
       { text: 'Priorité de traitement', included: true },
     ],
-    cta: 'Passer à Pro',
+    cta: 'Choisir Scale',
+    slug: 'scale',
     highlighted: true,
     badge: 'Recommandé',
+  },
+  {
+    name: 'Team',
+    price: '79 €',
+    period: 'mois',
+    limit: '100 messages / mois',
+    description: 'Pour les équipes qui gèrent plusieurs boîtes email.',
+    features: [
+      { text: '100 messages / mois', included: true },
+      { text: 'Plusieurs boîtes mail', included: true },
+      { text: 'Résumés de threads', included: true },
+      { text: 'Recherche en langage naturel', included: true },
+      { text: 'Multi-comptes', included: true },
+      { text: 'Priorité de traitement', included: true },
+    ],
+    cta: 'Choisir Team',
+    slug: 'team',
+    highlighted: false,
   },
 ]
 
@@ -53,6 +77,17 @@ const cardVariants: Variants = {
 }
 
 export function Pricing() {
+  const [loadingSlug, setLoadingSlug] = useState<string | null>(null)
+
+  async function handleCheckout(slug: string) {
+    setLoadingSlug(slug)
+    try {
+      await createCheckoutSession(slug)
+    } catch {
+      setLoadingSlug(null)
+    }
+  }
+
   return (
     <section
       id="pricing"
@@ -102,7 +137,7 @@ export function Pricing() {
             className="text-base max-w-md mx-auto"
             style={{ color: 'var(--text-2)', lineHeight: 1.65 }}
           >
-            Commence gratuitement. Passe à Pro quand tu ne peux plus t'en passer.
+            Commence gratuitement. Passe à Pro quand tu ne peux plus t&apos;en passer.
           </motion.p>
         </div>
 
@@ -112,11 +147,11 @@ export function Pricing() {
           initial="hidden"
           whileInView="visible"
           viewport={{ once: true }}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-6 items-start"
+          className="grid grid-cols-1 sm:grid-cols-3 gap-6 items-start"
         >
-          {plans.map((plan, i) => (
+          {plans.map((plan) => (
             <motion.div
-              key={i}
+              key={plan.slug}
               variants={cardVariants}
               className="relative rounded-xl p-8 flex flex-col gap-6"
               style={
@@ -134,7 +169,7 @@ export function Pricing() {
                     }
               }
             >
-              {/* Top accent line for Pro */}
+              {/* Top accent line for Scale */}
               {plan.highlighted && (
                 <div
                   className="absolute top-0 left-[15%] right-[15%] h-[3px] rounded-b-full"
@@ -150,7 +185,7 @@ export function Pricing() {
                   <span
                     className="inline-flex px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest"
                     style={{
-                      background: `linear-gradient(135deg, var(--accent), var(--violet))`,
+                      background: 'linear-gradient(135deg, var(--accent), var(--violet))',
                       color: '#fff',
                     }}
                   >
@@ -168,14 +203,20 @@ export function Pricing() {
                   {plan.name}
                 </p>
                 <p
-                  className="text-sm mb-4"
+                  className="text-sm mb-2"
                   style={{ color: 'var(--text-2)', lineHeight: 1.6 }}
                 >
                   {plan.description}
                 </p>
+                <p
+                  className="text-xs font-medium"
+                  style={{ color: 'var(--accent)', opacity: 0.8 }}
+                >
+                  {plan.limit}
+                </p>
 
                 {/* Price */}
-                <div className="flex items-baseline gap-1.5 mb-4">
+                <div className="flex items-baseline gap-1.5 mt-4 mb-0">
                   <span
                     className="text-4xl font-bold tracking-tight"
                     style={{ color: plan.highlighted ? 'var(--accent)' : 'var(--text)', letterSpacing: '-0.04em' }}
@@ -243,6 +284,8 @@ export function Pricing() {
                         border: '1px solid var(--border-md)',
                       }
                 }
+                disabled={loadingSlug === plan.slug}
+                onClick={() => handleCheckout(plan.slug)}
                 onMouseEnter={(e) => {
                   if (plan.highlighted) {
                     ;(e.currentTarget as HTMLButtonElement).style.backgroundColor =
@@ -269,7 +312,14 @@ export function Pricing() {
                   }
                 }}
               >
-                {plan.cta}
+                {loadingSlug === plan.slug ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin" />
+                    <span>Redirection...</span>
+                  </>
+                ) : (
+                  plan.cta
+                )}
               </button>
             </motion.div>
           ))}

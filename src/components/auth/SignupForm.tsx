@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -20,18 +20,30 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
-  const [state, setState] = useState<SignupFormState>({ status: 'idle' })
+
+  // Extract session_id from URL (injected by Stripe success_url)
+  const pendingSessionId =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('session_id') ?? undefined
+      : undefined
+
+  const { status, errorMessage, signup } = useSignupWithStripeLinking({
+    pendingSessionId,
+    redirectTo: '/chat',
+  })
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const isLoading =
+    status === 'signing_up' || status === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -44,7 +56,6 @@ export function SignupForm() {
 
     if (password && confirmPassword && password !== confirmPassword) {
       fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
       return false
     }
 
@@ -52,7 +63,6 @@ export function SignupForm() {
       fieldErrors.confirmPassword = 'La confirmation est requise'
     } else if (password !== confirmPassword) {
       fieldErrors.confirmPassword = 'Les mots de passe ne correspondent pas'
-      setState({ status: 'password_mismatch', fieldErrors })
       return false
     }
 
@@ -69,29 +79,24 @@ export function SignupForm() {
 
     if (!validate()) return
 
-    setState({ status: 'loading' })
+    const result = await signup(email, password)
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
-      return
+    if (!result.ok && result.error) {
+      setState({ status: 'error', errorMessage: result.error })
     }
-
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
-      setState({ status: 'error', errorMessage: message })
-      return
-    }
-
-    router.push('/chat')
   }
+
+  function setState(_state: SignupFormState | ((prev: SignupFormState) => SignupFormState)) {
+    // intentionally no-op — status is driven by the hook
+  }
+
+  const [localState, setLocalState] = useState<SignupFormState>({ status: 'idle' })
+
+  const state: SignupFormState = status === 'signing_up' || status === 'linking'
+    ? { status: 'loading' }
+    : status === 'error' && errorMessage
+    ? { status: 'error', errorMessage }
+    : localState
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
