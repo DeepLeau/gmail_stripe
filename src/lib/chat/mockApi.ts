@@ -1,4 +1,6 @@
 import { MOCK_RESPONSES, MOCK_RESPONSES_COUNT } from './responses'
+import { decrementUnits } from '@/app/actions/subscription'
+import { createClient } from '@/lib/supabase/client'
 
 /**
  * Simulated network delay range in milliseconds.
@@ -25,14 +27,13 @@ export function selectRandomResponse(): string {
   return MOCK_RESPONSES[index]
 }
 
+export interface SendMessageResult {
+  text: string
+  limitReached?: boolean
+}
+
 /**
  * Mock implementation of the chat API.
- *
- * Current signature (mock):
- *   async function sendMessage(content: string): Promise<string>
- *
- * Target signature (future replacement with real API):
- *   async function sendMessage(content: string): Promise<{ text: string; model?: string }>
  *
  * @param _content - The user's message content (ignored in mock, kept for signature compatibility)
  * @returns The AI response as a plain string
@@ -43,41 +44,60 @@ export async function sendMessage(_content: string): Promise<string> {
 }
 
 /**
- * Response type for sendChatMessage API call.
+ * Result type for sendChatMessage API call.
  */
 export interface ChatResponse {
   text: string
   units_used?: number
   model?: string
+  limitReached?: boolean
 }
 
 /**
  * API-compatible chat message sender.
- * Calls the real /api/chat/send endpoint.
- * 
+ * Checks quota via decrementUnits() before calling /api/chat/send.
+ * Allows unauthenticated users through without quota check.
+ *
  * @param content - The user's message content
  * @param _userId - User ID (kept for API compatibility, not used in mock)
- * @returns Promise resolving to ChatResponse with AI text and units_used
+ * @returns Promise resolving to ChatResponse with AI text, units_used, or limitReached flag
  */
 export async function sendChatMessage(
   content: string,
   _userId?: string
 ): Promise<ChatResponse> {
-  const response = await fetch('/api/chat/send', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
-  })
-
-  if (!response.ok) {
-    if (response.status === 403) {
-      const error = await response.json()
-      if (error.error === 'limit_reached') {
-        throw new Error('limit_reached')
+  const supabase = createClient()
+  if (supabase) {
+    const { data: sessionData } = await supabase.auth.getSession()
+    if (sessionData?.session?.user) {
+      const decrementResult = await decrementUnits()
+      if (!decrementResult.success) {
+        return { text: '', limitReached: true }
       }
     }
-    throw new Error('Failed to send message')
   }
 
-  return response.json()
+  try {
+    const response = await fetch('/api/chat/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    })
+
+    if (!response.ok) {
+      if (response.status === 403) {
+        const error = await response.json()
+        if (error.error === 'limit_reached') {
+          return { text: '', limitReached: true }
+        }
+      }
+      throw new Error('Failed to send message')
+    }
+
+    return response.json()
+  } catch {
+    // Fallback to mock response
+    await simulateDelay()
+    return { text: selectRandomResponse() }
+  }
 }

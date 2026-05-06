@@ -3,30 +3,29 @@
 import { useState, useRef, useEffect } from 'react'
 import { LogOut, Loader2 } from 'lucide-react'
 import { logoutAction } from '@/app/actions/auth'
+import type { SubscriptionData } from '@/lib/stripe/config'
 
 type UserMenuProps = {
   userEmail: string
-  plan?: string | null
+  subscription?: SubscriptionData | null
 }
 
 const PLAN_BADGE_STYLES: Record<string, { bg: string; text: string; label: string }> = {
-  starter: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Starter' },
-  growth: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Growth' },
-  pro: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Pro' },
+  start: { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Start' },
+  scale: { bg: 'bg-purple-100', text: 'text-purple-700', label: 'Scale' },
+  enterprise: { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Enterprise' },
 }
 
-export function UserMenu({ userEmail, plan }: UserMenuProps) {
+export function UserMenu({ userEmail, subscription }: UserMenuProps) {
   const [open, setOpen] = useState(false)
   const [loggingOut, setLoggingOut] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
-  // Initiales : 2 premières lettres de l'email, uppercase
   const initials = userEmail.slice(0, 2).toUpperCase()
 
-  // Badge style
-  const badgeStyle = plan ? PLAN_BADGE_STYLES[plan.toLowerCase()] : null
+  const planKey = subscription?.plan?.toLowerCase() ?? null
+  const badgeStyle = planKey ? PLAN_BADGE_STYLES[planKey] : null
 
-  // Fermeture clic extérieur + Escape
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {

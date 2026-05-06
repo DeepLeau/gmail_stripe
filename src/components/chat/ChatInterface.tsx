@@ -2,16 +2,25 @@
 
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
-import { sendMessage } from '@/lib/chat/mockApi'
+import type { SubscriptionData } from '@/lib/stripe/config'
+import { sendChatMessage } from '@/lib/chat/mockApi'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  subscription?: SubscriptionData | null
+}
+
+export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
+  const [limitReachedBanner, setLimitReachedBanner] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  const remaining = subscription?.units_remaining ?? null
+  const isLimitReached = remaining !== null && remaining <= 0
 
   // Scroll automatique vers le bas après chaque message
   useEffect(() => {
@@ -28,7 +37,11 @@ export function ChatInterface() {
     const trimmed = inputValue.trim()
     if (!trimmed || isLoading) return
 
-    // Ajout du message utilisateur
+    if (isLimitReached) {
+      setLimitReachedBanner(true)
+      return
+    }
+
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: 'user',
@@ -37,28 +50,42 @@ export function ChatInterface() {
     }
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
+    setLimitReachedBanner(false)
 
-    // Appel API
     setIsLoading(true)
     try {
-      const response = await sendMessage(trimmed)
+      const response = await sendChatMessage(trimmed)
+      if (response.limitReached) {
+        setLimitReachedBanner(true)
+        return
+      }
       const aiMessage: ChatMessage = {
         id: crypto.randomUUID(),
         role: 'ai',
-        content: response,
+        content: response.text,
         timestamp: Date.now(),
       }
       setMessages((prev) => [...prev, aiMessage])
     } catch {
-      // Erreur silencieuse — could add error state here
+      // Erreur silencieuse
     } finally {
       setIsLoading(false)
     }
   }
 
+  const showLimitBanner = limitReachedBanner || isLimitReached
+
   return (
     <div className="flex flex-col h-full py-6">
-      {/* Zone des messages */}
+      {showLimitBanner && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-[var(--red)]/8 border border-[var(--red)]/20 text-sm text-[var(--red)] text-center">
+          Tu as atteint ta limite de messages pour ce mois.{' '}
+          <a href="/#pricing" className="underline font-medium hover:no-underline">
+            Débloque plus de questions →
+          </a>
+        </div>
+      )}
+
       <div className="flex-1 overflow-y-auto space-y-4 min-h-0">
         {messages.length === 0 && (
           <div className="flex flex-col items-center justify-center h-full text-center">
@@ -95,13 +122,13 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input fixe en bas */}
       <div className="shrink-0 pt-4">
         <ChatInput
           value={inputValue}
           onChange={setInputValue}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
+          remaining={remaining}
         />
       </div>
     </div>

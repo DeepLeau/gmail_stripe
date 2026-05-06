@@ -1,9 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
+import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -20,18 +20,26 @@ const MIN_PASSWORD_LENGTH = 6
 
 export function SignupForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [state, setState] = useState<SignupFormState>({ status: 'idle' })
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
 
-  const isLoading = state.status === 'loading'
+  const pendingSessionId = searchParams.get('session_id') ?? undefined
+
+  const { status: hookStatus, errorMessage: hookError, signup } = useSignupWithStripeLinking({
+    pendingSessionId,
+    redirectTo: '/chat',
+  })
+
+  const isLoading = state.status === 'loading' || hookStatus === 'signing_up' || hookStatus === 'linking'
 
   function validate(): boolean {
     const fieldErrors: SignupFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -71,21 +79,10 @@ export function SignupForm() {
 
     setState({ status: 'loading' })
 
-    const supabase = createClient()
-    if (!supabase) {
-      setState({ status: 'error', errorMessage: 'Service temporairement indisponible' })
-      return
-    }
+    const result = await signup(email.trim(), password)
 
-    const { error } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-    })
-
-    if (error) {
-      const message = error.message === 'User already registered'
-        ? 'Un compte existe déjà avec cet email'
-        : 'Une erreur est survenue lors de la création du compte'
+    if (!result.ok) {
+      const message = hookError ?? 'Une erreur est survenue lors de la création du compte'
       setState({ status: 'error', errorMessage: message })
       return
     }
@@ -178,7 +175,7 @@ export function SignupForm() {
         )}
       </div>
 
-      {/* Message d'erreur global */}
+      {/* Message d'erreur global (hook Stripe + validation) */}
       {state.status === 'error' && !state.fieldErrors?.confirmPassword && state.errorMessage && (
         <p className="text-sm text-[var(--red)] text-center py-2 px-3 rounded-lg bg-[var(--red)]/5 border border-[var(--red)]/15">
           {state.errorMessage}
