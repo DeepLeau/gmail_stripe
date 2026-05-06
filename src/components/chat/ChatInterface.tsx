@@ -17,6 +17,7 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
   const [isLoading, setIsLoading] = useState(false)
   const [inputValue, setInputValue] = useState('')
   const [limitReachedBanner, setLimitReachedBanner] = useState(false)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
   const remaining = subscription?.units_remaining ?? null
@@ -30,6 +31,12 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
       })
     }
   }, [messages.length])
+
+  // Effacer le message d'erreur quand l'utilisateur tape
+  const handleInputChange = (value: string) => {
+    setInputValue(value)
+    if (errorMessage) setErrorMessage(null)
+  }
 
   const handleSubmit = async (e?: FormEvent) => {
     e?.preventDefault()
@@ -51,23 +58,33 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
     setMessages((prev) => [...prev, userMessage])
     setInputValue('')
     setLimitReachedBanner(false)
+    setErrorMessage(null)
 
     setIsLoading(true)
+    let response
     try {
-      const response = await sendChatMessage(trimmed)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30_000)
+
+      response = await sendChatMessage(trimmed)
+      clearTimeout(timeoutId)
+
       if (response.limitReached) {
         setLimitReachedBanner(true)
+        setIsLoading(false)
         return
       }
-      const aiMessage: ChatMessage = {
+
+      const assistantMessage: ChatMessage = {
         id: crypto.randomUUID(),
-        role: 'ai',
+        role: 'assistant',
         content: response.text,
         timestamp: Date.now(),
       }
-      setMessages((prev) => [...prev, aiMessage])
+      setMessages((prev) => [...prev, assistantMessage])
     } catch {
-      // Erreur silencieuse
+      // Affichage discret sous le champ input — pas de modal, pas de toast
+      setErrorMessage("Je n'ai pas pu générer de réponse. Réessaie.")
     } finally {
       setIsLoading(false)
     }
@@ -123,9 +140,15 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
       </div>
 
       <div className="shrink-0 pt-4">
+        {/* Message d'erreur discret sous le champ input */}
+        {errorMessage && (
+          <p className="mb-2 text-xs text-[var(--text-2)] text-center">
+            {errorMessage}
+          </p>
+        )}
         <ChatInput
           value={inputValue}
-          onChange={setInputValue}
+          onChange={handleInputChange}
           onSubmit={() => handleSubmit()}
           isLoading={isLoading}
           remaining={remaining}

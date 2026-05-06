@@ -34,13 +34,13 @@ export interface SendMessageResult {
 
 /**
  * Mock implementation of the chat API.
+ * DISABLED in production — throws to force use of /api/chat/send.
  *
- * @param _content - The user's message content (ignored in mock, kept for signature compatibility)
- * @returns The AI response as a plain string
+ * @param _content - The user's message content (ignored)
+ * @throws Error indicating that the mock API is disabled in production
  */
 export async function sendMessage(_content: string): Promise<string> {
-  await simulateDelay()
-  return selectRandomResponse()
+  throw new Error('Mock API désactivée en production — utiliser /api/chat/send')
 }
 
 /**
@@ -77,27 +77,21 @@ export async function sendChatMessage(
     }
   }
 
-  try {
-    const response = await fetch('/api/chat/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    })
+  const response = await fetch('/api/chat/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  })
 
-    if (!response.ok) {
-      if (response.status === 403) {
-        const error = await response.json()
-        if (error.error === 'limit_reached') {
-          return { text: '', limitReached: true }
-        }
+  if (!response.ok) {
+    if (response.status === 403) {
+      const error = await response.json()
+      if (error.error === 'limit_reached') {
+        return { text: '', limitReached: true }
       }
-      throw new Error('Failed to send message')
     }
-
-    return response.json()
-  } catch {
-    // Fallback to mock response
-    await simulateDelay()
-    return { text: selectRandomResponse() }
+    throw new Error('Failed to send message')
   }
+
+  return response.json()
 }
