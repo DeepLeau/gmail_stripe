@@ -4,20 +4,20 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 
 ## ✨ Features
 
-- **AI Chat Interface** — Clean, modern chat experience to interact with your emails in natural language
-- **User Authentication** — Sign up and log in to access your personal email assistant
-- **Subscription Plans** — Choose from Starter, Growth, and Enterprise tiers with Stripe integration
+- **AI Chat Interface** — Natural language conversations with your email assistant powered by Groq
+- **Chat History** — Your conversation context is preserved for seamless follow-up questions
+- **Stripe Subscriptions** — Multiple pricing tiers (Starter, Scale, Enterprise) with secure payment processing
 
 ## 🛠️ Tech Stack
 
 - **Framework**: Next.js 14 (App Router)
 - **Language**: TypeScript
+- **AI**: Groq API (fast LLM inference)
+- **Auth & Database**: Supabase
+- **Payments**: Stripe
 - **Styling**: Tailwind CSS
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
-- **UI Utilities**: clsx, tailwind-merge, class-variance-authority
-- **Auth & Database**: Supabase Authentication
-- **Payments**: Stripe (checkout, webhooks, subscription management)
 
 ## 🚀 Quick Start
 
@@ -48,26 +48,34 @@ npm install
 
 ### 3. Set up environment variables
 
-Create a file named `.env.local` in the root of your project (same folder as `package.json`).
+Create a file named `.env.local` in the root of your project (same folder as `package.json`). This file stores sensitive configuration that your app needs to run — never share it or commit it to Git.
 
 Copy the template from `.env.example` and fill in each value:
 
 ```bash
-# Supabase — find these in your Supabase dashboard
+# Groq API — free tier with generous quotas
+# Get your key at: https://console.groq.com/keys
+GROQ_API_KEY=gsk_...
+
+# Session secret — minimum 32 random characters, keep private
+# Generate one: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+SESSION_SECRET=your-64-char-random-hex-string
+
+# Supabase — from your project dashboard
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
 
-# Stripe — find these at https://dashboard.stripe.com/apikeys
+# Stripe — from your Stripe dashboard
 STRIPE_SECRET_KEY=sk_test_...
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 
-# Stripe Price IDs — create these in Stripe Dashboard > Products
+# Stripe Price IDs — create products in Stripe Dashboard > Products
 STRIPE_START_PRICE_ID=price_...
 STRIPE_SCALE_PRICE_ID=price_...
 STRIPE_ENTERPRISE_PRICE_ID=price_...
 
-# Base URL — your app's URL
+# Your app's URL
 NEXT_PUBLIC_BASE_URL=http://localhost:3000
 ```
 
@@ -83,36 +91,25 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Supabase anonymous key (safe to expose in client) |
-| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe secret key (sk_test_... or sk_live_...) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe publishable key (pk_test_... or pk_live_...) |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks | Webhook signing secret (whsec_...) |
-| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Pricing | Price ID for Starter plan (€9.99/month) |
-| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Pricing | Price ID for Scale plan (€29.99/month) |
-| `STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Pricing | Price ID for Enterprise plan (€99.99/month) |
-| `NEXT_PUBLIC_BASE_URL` | Yes | — | Your app's base URL (http://localhost:3000 for dev) |
-
-**How to find your Supabase credentials:**
-1. Go to [supabase.com](https://supabase.com) and sign in
-2. Select your project
-3. Go to **Project Settings** (gear icon)
-4. Click **API** in the sidebar
-5. Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy **anon/public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-**How to create Stripe Price IDs:**
-1. Go to [dashboard.stripe.com](https://dashboard.stripe.com)
-2. Navigate to **Products** > **Add product**
-3. Create a product for each plan (Starter, Scale, Enterprise)
-4. Set the price (recurring, monthly)
-5. Click on the price > copy the **Price ID** (starts with `price_`)
+| `GROQ_API_KEY` | Yes | [console.groq.com/keys](https://console.groq.com/keys) — create a key (free account) | Server-side API key for AI completions |
+| `SESSION_SECRET` | Yes | Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` | 64-character hex string for securing user sessions |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project endpoint |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Public key for client-side Supabase access |
+| `SUPABASE_SERVICE_ROLE_KEY` | Yes | Supabase Dashboard > Project Settings > API > service_role key | Server-side key for admin operations (keep secret) |
+| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe secret key for server-side operations |
+| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe public key for client-side Stripe.js |
+| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Webhooks — after adding a webhook endpoint | Validates incoming webhook events |
+| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Price ID | Price ID for Starter plan |
+| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Price ID | Price ID for Scale plan |
+| `STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard > Products > your product > Price ID | Price ID for Enterprise plan |
+| `NEXT_PUBLIC_BASE_URL` | Yes | Your deployment URL (e.g., `http://localhost:3000` for dev) | Base URL for your application |
 
 ## 📁 Project Structure
 
-- `src/app` — Next.js App Router pages, API routes, and server actions
-- `src/components` — React components (auth, chat, pricing, UI)
-- `src/lib` — Utility libraries (Stripe client/config, chat mock API)
+- `src/lib/chat` — Chat utilities: type definitions, Groq API client, conversation history, mock API for development
+- `src/app/api/chat/send` — API route that handles sending messages to the AI
+- `src/components/chat` — React component for the chat interface
+- `.env.example` — Template with all required environment variables
 
 ## 🚀 Deploy to Vercel
 
@@ -120,22 +117,25 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 1. Click the button above or go to [vercel.com/new](https://vercel.com/new)
 2. Import your GitHub repository
-3. In the Vercel dashboard, go to **Settings** > **Environment Variables**
+3. In the Vercel dashboard, go to **Settings > Environment Variables**
 4. Add all variables from your `.env.local` file:
 
+   - `GROQ_API_KEY`
+   - `SESSION_SECRET`
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
    - `STRIPE_SECRET_KEY`
-   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
    - `STRIPE_WEBHOOK_SECRET`
    - `STRIPE_START_PRICE_ID`
    - `STRIPE_SCALE_PRICE_ID`
    - `STRIPE_ENTERPRISE_PRICE_ID`
-   - `NEXT_PUBLIC_BASE_URL`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel deployment URL, e.g., `https://your-app.vercel.app`)
 
 5. Click **Deploy**
 
-> ⚠️ **Important**: After deploying, update `NEXT_PUBLIC_BASE_URL` to your production domain (e.g., `https://your-app.vercel.app`) and configure your Stripe webhook to point to `https://your-app.vercel.app/api/stripe/webhook`.
+> 💡 **Don't forget**: Set up your Stripe webhook in the Stripe Dashboard to point to `https://your-app.vercel.app/api/webhook` so subscription events are processed correctly.
 
 ## 📝 License
 
