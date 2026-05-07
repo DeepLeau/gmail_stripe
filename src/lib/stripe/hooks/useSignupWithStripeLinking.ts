@@ -53,9 +53,10 @@
  * ─── ORCHESTRATION (identique dans les deux modes) ────────────────────────
  *
  *   1. Exécute le signup (auth.signUp en mode 1, signupFn en mode 2)
- *   2. Si pendingSessionId présent : linkStripeSessionToUser(pendingSessionId)
- *   3. Si pending_not_found avec retry=true : retry une fois après 2s
- *   4. router.push(redirectTo)
+ *   2. Après signup réussi → fire-and-forget: sendWelcomeEmail (si firstName dispo)
+ *   3. Si pendingSessionId présent : linkStripeSessionToUser(pendingSessionId)
+ *   4. Si pending_not_found avec retry=true : retry une fois après 2s
+ *   5. router.push(redirectTo)
  *
  * Status retourné :
  *   - 'idle'          → état initial
@@ -76,6 +77,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { linkStripeSessionToUser } from '@/app/actions/subscription'
+import { sendWelcomeEmail } from '@/lib/email/welcome'
 
 export type SignupStatus = 'idle' | 'signing_up' | 'linking' | 'error'
 
@@ -171,7 +173,7 @@ export function useSignupWithStripeLinking(
         result = await linkStripeSessionToUser(opts.pendingSessionId)
       }
 
-      // Si échec persistent : log mais on redirige quand même.
+      // Si échec persistants : log mais on redirige quand même.
       // L'user pourra retry depuis une page settings/billing si le projet en a.
       if (!result.success) {
         console.warn('[useSignupWithStripeLinking] Linking failed after retry:', result.error)
@@ -217,6 +219,21 @@ export function useSignupWithStripeLinking(
       setErrorMessage(msg)
       return { ok: false, error: msg }
     }
+
+    // ── Email de bienvenue (fire-and-forget) ──────────────────────────────
+    // On a le email en paramètre. Le firstName vient des userMetadata si fourni.
+    const firstName =
+      typeof userMetadata?.first_name === 'string'
+        ? (userMetadata.first_name as string)
+        : undefined
+
+    // Ne pas await : le user ne doit pas attendre l'envoi email avant le redirect.
+    // Le catch logue l'erreur serveur sans bloquer le flow.
+    sendWelcomeEmail({ to: email, firstName }).catch(err => {
+      // eslint-disable-next-line no-console
+      console.error('[useSignupWithStripeLinking] sendWelcomeEmail error:', err)
+    })
+    // ─────────────────────────────────────────────────────────────────────
 
     return finalizeAfterSignup()
   }
