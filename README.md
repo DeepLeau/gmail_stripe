@@ -49,7 +49,7 @@ npm install
 
 ### 3. Set up environment variables
 
-Create a file named `.env.local` in the root of your project (same folder as `package.json`).
+Create a file named `.env.local` in the root of your project (same folder as `package.json`). This file stores sensitive configuration like API keys — it never gets committed to GitHub.
 
 Copy the template from `.env.example` and fill in each value:
 
@@ -83,6 +83,8 @@ npm run dev
 
 Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
+> 💡 **VS Code tip**: Open the integrated terminal with `Ctrl+`` (or `Cmd+`` on Mac)
+
 ## 🔑 Environment Variables
 
 | Variable | Required | Where to find it | Description |
@@ -91,60 +93,41 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Supabase anonymous key (safe to expose in client) |
 | `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe secret key (sk_test_... or sk_live_...) |
 | `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe publishable key (pk_test_... or pk_live_...) |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Webhooks | Webhook signing secret (whsec_...) |
-| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products | Price ID for Start plan (9,99€/month) |
-| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products | Price ID for Scale plan (29,99€/month) |
-| `STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard > Products | Price ID for Enterprise plan (99,99€/month) |
-| `OPENROUTER_API_KEY` | Yes | [openrouter.ai/keys](https://openrouter.ai/keys) | OpenRouter API key for AI models |
-| `NEXT_PUBLIC_BASE_URL` | Yes | — | Your app's base URL (http://localhost:3000 in dev) |
-| `NEXT_PUBLIC_APP_URL` | Yes | — | Public URL for OpenRouter referer header |
-| `NEXT_PUBLIC_APP_NAME` | Yes | — | Your app name (sent to OpenRouter for analytics) |
-
-### Finding Supabase Variables
-
-1. Go to [supabase.com](https://supabase.com) and sign in
-2. Select your project
-3. Click **Project Settings** (gear icon) in the sidebar
-4. Click **API** in the top navigation
-5. Copy **Project URL** → paste as `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy **anon/public** key → paste as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-
-### Finding Stripe Variables
-
-1. Go to [dashboard.stripe.com](https://dashboard.stripe.com) and sign in
-2. **Publishable/Secret keys**: Developers > API keys
-3. **Webhook secret**: Developers > Webhooks > select endpoint > reveal signing secret
-4. **Price IDs**: Products > select product > Pricing tab > copy Price ID
-
-### Getting OpenRouter API Key
-
-1. Go to [openrouter.ai/keys](https://openrouter.ai/keys)
-2. Click **Create Key**
-3. Give it a name (e.g., "Emind Dev")
-4. Copy the generated key → paste as `OPENROUTER_API_KEY`
+| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks | Webhook signature verification secret |
+| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products > Start plan > Price ID | Price ID for the Start subscription (9,99€/month) |
+| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products > Scale plan > Price ID | Price ID for the Scale subscription (29,99€/month) |
+| `STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard > Products > Enterprise plan > Price ID | Price ID for the Enterprise subscription (99,99€/month) |
+| `OPENROUTER_API_KEY` | Yes | OpenRouter Dashboard > Keys > Create Key | OpenRouter API key for AI model access |
+| `NEXT_PUBLIC_BASE_URL` | Yes | Your choice | Base URL of your app (http://localhost:3000 for dev) |
+| `NEXT_PUBLIC_APP_URL` | Yes | Your choice | Public URL of your app (used as HTTP-Referer for OpenRouter) |
+| `NEXT_PUBLIC_APP_NAME` | No | Your choice | Your app name for OpenRouter analytics (default: Emind) |
 
 ## 📁 Project Structure
 
-- `src/app` — Next.js App Router pages and API routes
-- `src/app/api/chat/send` — API route for sending chat messages
-- `src/components/chat` — Chat interface components
-- `src/lib/chat` — Chat-related utilities and API client
-- `src/lib/openrouter` — OpenRouter AI client integration
+src/app/api/chat/send — API route handling AI chat message processing
 
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-1. Click the **Deploy** button above or go to [vercel.com/new](https://vercel.com/new)
+1. Click the **Deploy with Vercel** button above (or go to [vercel.com/new](https://vercel.com/new))
 2. Import your GitHub repository
-3. Add all your environment variables in Vercel dashboard:
-   - Go to **Settings** > **Environment Variables**
-   - Add each variable from your `.env.local` file
+3. Add all environment variables in **Vercel Dashboard > Settings > Environment Variables**:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `STRIPE_SECRET_KEY`
+   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
+   - `STRIPE_WEBHOOK_SECRET`
+   - `STRIPE_START_PRICE_ID`
+   - `STRIPE_SCALE_PRICE_ID`
+   - `STRIPE_ENTERPRISE_PRICE_ID`
+   - `OPENROUTER_API_KEY`
+   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel domain, e.g., https://your-app.vercel.app)
+   - `NEXT_PUBLIC_APP_URL` (same as above)
+   - `NEXT_PUBLIC_APP_NAME`
 4. Click **Deploy**
 
-Your app will be live at a URL like `your-app.vercel.app`.
-
-> ⚠️ Don't forget to set `NEXT_PUBLIC_BASE_URL` to your production domain in Vercel!
+> ⚠️ **Important**: Add the same environment variables to Vercel that you used locally. Without them, your app won't work!
 
 ## 📝 License
 
