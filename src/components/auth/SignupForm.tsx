@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
+import { trackEvent } from '@/lib/analytics/events'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -87,6 +88,7 @@ export function SignupForm() {
       return
     }
 
+    trackEvent('signup_completed')
     router.push('/chat')
   }
 

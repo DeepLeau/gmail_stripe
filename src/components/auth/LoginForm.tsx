@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import { trackEvent } from '@/lib/analytics/events'
 
 type LoginFormState = {
   status: 'idle' | 'loading' | 'error' | 'success'
@@ -28,7 +29,7 @@ export function LoginForm() {
     const fieldErrors: LoginFormState['fieldErrors'] = {}
 
     if (!email.trim()) {
-      fieldErrors.email = 'L\'adresse email est requise'
+      fieldErrors.email = "L'adresse email est requise"
     } else if (!EMAIL_REGEX.test(email.trim())) {
       fieldErrors.email = 'Adresse email invalide'
     }
@@ -69,6 +70,7 @@ export function LoginForm() {
     }
 
     if (data.session) {
+      trackEvent('login_completed')
       setState({ status: 'success' })
       router.push('/chat')
     } else {

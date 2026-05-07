@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics/events'
 
 const STRIPE_PRICE_IDS: Record<string, string> = {
   start: process.env.NEXT_PUBLIC_STRIPE_START_PRICE_ID ?? 'price_start',
@@ -96,6 +97,8 @@ const cardVariants: Variants = {
 
 export function Pricing() {
   async function handleCheckout(planId: string) {
+    trackEvent('checkout_started', { plan: planId })
+
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',

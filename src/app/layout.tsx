@@ -1,5 +1,8 @@
 import type { Metadata } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
+import { Suspense } from 'react'
+import { PostHogProvider } from '@/lib/analytics/provider'
+import { PostHogPageView } from '@/lib/analytics/PostHogPageView'
 import './globals.css'
 
 const inter = Inter({
@@ -67,7 +70,12 @@ export default function RootLayout({
         </svg>
       </head>
       <body className="antialiased" style={{ fontFamily: 'var(--font-inter), Inter, sans-serif' }}>
-        {children}
+        <PostHogProvider>
+          <Suspense fallback={null}>
+            <PostHogPageView />
+          </Suspense>
+          {children}
+        </PostHogProvider>
       </body>
     </html>
   )
