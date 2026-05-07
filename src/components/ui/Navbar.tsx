@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Menu, X, ArrowRight } from 'lucide-react'
+import posthog from 'posthog-js'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -59,12 +60,18 @@ export function Navbar() {
             <a
               href="/login"
               className="h-8 px-3 flex items-center justify-center text-sm text-[var(--text-2)] hover:text-[var(--text)] transition-colors duration-150 rounded-md border border-transparent hover:border-[var(--border)]"
+              onClick={() =>
+                posthog.capture('cta_click', { location: 'navbar', cta_label: 'Se connecter' })
+              }
             >
               Se connecter
             </a>
             <a
               href="/signup"
               className="h-9 px-4 flex items-center justify-center rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors duration-150 shadow-sm gap-1.5"
+              onClick={() =>
+                posthog.capture('cta_click', { location: 'navbar', cta_label: 'Commencer' })
+              }
             >
               Commencer
               <ArrowRight size={14} strokeWidth={2} />
@@ -114,14 +121,21 @@ export function Navbar() {
             ))}
             <div className="pt-3 border-t border-[var(--border)] mt-2 flex flex-col gap-2">
               <a
-                href="#"
+                href="/login"
                 className="px-4 py-2.5 text-sm text-center text-[var(--text-2)] border border-[var(--border)] rounded-lg hover:bg-[var(--surface)] transition-colors"
+                onClick={() => {
+                  setMenuOpen(false)
+                  posthog.capture('cta_click', { location: 'navbar', cta_label: 'Se connecter' })
+                }}
               >
                 Se connecter
               </a>
               <a
-                href="#pricing"
-                onClick={() => setMenuOpen(false)}
+                href="/signup"
+                onClick={() => {
+                  setMenuOpen(false)
+                  posthog.capture('cta_click', { location: 'navbar', cta_label: 'Commencer' })
+                }}
                 className="px-4 py-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors"
               >
                 Commencer
