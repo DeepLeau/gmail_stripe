@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Mail, Search, MessageCircle, Zap, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { trackEvent } from '@/lib/analytics/events'
 
 // Chat mock data for the hero
 const chatMessages = [
@@ -230,14 +231,26 @@ export function Hero() {
               )}
             >
               <a
-                href="#"
+                href="/signup"
+                onClick={() =>
+                  trackEvent('cta_click', {
+                    cta: 'hero_primary',
+                    destination: '/signup',
+                  })
+                }
                 className="btn-hero-primary"
               >
                 Connecter ma boîte mail
                 <ArrowRight size={16} strokeWidth={1.5} />
               </a>
               <a
-                href="#examples"
+                href="/#examples"
+                onClick={() =>
+                  trackEvent('cta_click', {
+                    cta: 'hero_secondary',
+                    destination: '/#examples',
+                  })
+                }
                 className="btn-hero-ghost"
               >
                 Voir une démo

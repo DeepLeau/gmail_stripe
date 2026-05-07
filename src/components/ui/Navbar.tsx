@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 import { Menu, X, ArrowRight } from 'lucide-react'
+import { trackEvent } from '@/lib/analytics/events'
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false)
@@ -64,6 +65,12 @@ export function Navbar() {
             </a>
             <a
               href="/signup"
+              onClick={() =>
+                trackEvent('cta_click', {
+                  cta: 'navbar_start',
+                  destination: '/signup',
+                })
+              }
               className="h-9 px-4 flex items-center justify-center rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors duration-150 shadow-sm gap-1.5"
             >
               Commencer
@@ -120,8 +127,14 @@ export function Navbar() {
                 Se connecter
               </a>
               <a
-                href="#pricing"
-                onClick={() => setMenuOpen(false)}
+                href="/signup"
+                onClick={() => {
+                  setMenuOpen(false)
+                  trackEvent('cta_click', {
+                    cta: 'navbar_start',
+                    destination: '/signup',
+                  })
+                }}
                 className="px-4 py-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hi)] text-white text-sm font-medium transition-colors"
               >
                 Commencer

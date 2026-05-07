@@ -4,9 +4,10 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 
 ## ✨ Features
 
-- **AI Chat Interface** — Clean, modern chat experience to interact with your emails in natural language
-- **Email Intelligence** — AI-powered email analysis and memory across conversations
-- **Multi-Model AI** — Powered by OpenRouter supporting Anthropic, OpenAI, Google, and more
+- **User Authentication** — Sign up and log in to access your account
+- **Pricing Plans** — View subscription tiers (Start, Scale, Enterprise)
+- **Analytics Integration** — Track page views and user events with PostHog
+- **Responsive Landing Page** — Modern UI with animated sections
 
 ## 🛠️ Tech Stack
 
@@ -16,9 +17,9 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Animations**: Framer Motion
 - **Icons**: Lucide React
 - **UI Utilities**: clsx, tailwind-merge, class-variance-authority
-- **AI Integration**: OpenRouter API
 - **Payments**: Stripe (subscriptions)
 - **Auth & Database**: Supabase
+- **Analytics**: PostHog
 
 ## 🚀 Quick Start
 
@@ -51,28 +52,21 @@ npm install
 
 Create a file named `.env.local` in the root of your project (same folder as `package.json`). This file stores sensitive configuration like API keys — it never gets committed to GitHub.
 
-Copy the template from `.env.example` and fill in each value:
+Copy the template from `.env.example`:
 
 ```bash
 # Supabase — authentication and database
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
-# Stripe — payments and subscriptions
-STRIPE_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_START_PRICE_ID=price_...
-STRIPE_SCALE_PRICE_ID=price_...
-STRIPE_ENTERPRISE_PRICE_ID=price_...
+# Stripe — subscription pricing (get these from your Stripe Dashboard)
+NEXT_PUBLIC_STRIPE_START_PRICE_ID=price_xxx
+NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID=price_xxx
+NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID=price_xxx
 
-# OpenRouter — AI model provider
-OPENROUTER_API_KEY=sk-or-...
-
-# App configuration
-NEXT_PUBLIC_BASE_URL=http://localhost:3000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-NEXT_PUBLIC_APP_NAME=Emind
+# PostHog — product analytics
+NEXT_PUBLIC_POSTHOG_KEY=phc_YOUR_PROJECT_KEY_HERE
+NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
 ```
 
 ### 4. Run the development server
@@ -89,45 +83,40 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 
 | Variable | Required | Where to find it | Description |
 |----------|----------|------------------|-------------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Supabase anonymous key (safe to expose in client) |
-| `STRIPE_SECRET_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe secret key (sk_test_... or sk_live_...) |
-| `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` | Yes | Stripe Dashboard > Developers > API keys | Stripe publishable key (pk_test_... or pk_live_...) |
-| `STRIPE_WEBHOOK_SECRET` | Yes | Stripe Dashboard > Developers > Webhooks | Webhook signature verification secret |
-| `STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard > Products > Start plan > Price ID | Price ID for the Start subscription (9,99€/month) |
-| `STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard > Products > Scale plan > Price ID | Price ID for the Scale subscription (29,99€/month) |
-| `STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard > Products > Enterprise plan > Price ID | Price ID for the Enterprise subscription (99,99€/month) |
-| `OPENROUTER_API_KEY` | Yes | OpenRouter Dashboard > Keys > Create Key | OpenRouter API key for AI model access |
-| `NEXT_PUBLIC_BASE_URL` | Yes | Your choice | Base URL of your app (http://localhost:3000 for dev) |
-| `NEXT_PUBLIC_APP_URL` | Yes | Your choice | Public URL of your app (used as HTTP-Referer for OpenRouter) |
-| `NEXT_PUBLIC_APP_NAME` | No | Your choice | Your app name for OpenRouter analytics (default: Emind) |
+| `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard → Project Settings → API → **Project URL** | Your Supabase project URL (looks like `https://xyzxyz.supabase.co`) |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard → Project Settings → API → **anon/public key** | Public key for Supabase client (safe to expose in browser) |
+| `NEXT_PUBLIC_STRIPE_START_PRICE_ID` | Yes | Stripe Dashboard → Products → select product → copy **Price ID** | Price ID for the "Start" plan |
+| `NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID` | Yes | Stripe Dashboard → Products → select product → copy **Price ID** | Price ID for the "Scale" plan |
+| `NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID` | Yes | Stripe Dashboard → Products → select product → copy **Price ID** | Price ID for the "Enterprise" plan |
+| `NEXT_PUBLIC_POSTHOG_KEY` | Yes | PostHog Dashboard → Project Settings → Project API Key | Your PostHog project key |
+| `NEXT_PUBLIC_POSTHOG_HOST` | Yes | PostHog Dashboard → Project Settings | Usually `https://eu.i.posthog.com` for EU servers |
 
 ## 📁 Project Structure
 
-src/app/api/chat/send — API route handling AI chat message processing
+- `src/app` — Next.js App Router layout and root configuration
+- `src/components/auth` — Login and signup forms
+- `src/components/sections` — Landing page sections (Hero, Pricing, FinalCTA)
+- `src/components/ui` — Reusable UI components (Navbar)
+- `src/lib/analytics` — PostHog analytics provider and event tracking
+- `src/providers` — React context providers for PostHog
 
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
-1. Click the **Deploy with Vercel** button above (or go to [vercel.com/new](https://vercel.com/new))
+1. Click the button above or go to [vercel.com/new](https://vercel.com/new)
 2. Import your GitHub repository
-3. Add all environment variables in **Vercel Dashboard > Settings > Environment Variables**:
+3. Add all environment variables in Vercel → Settings → Environment Variables:
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `STRIPE_SECRET_KEY`
-   - `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`
-   - `STRIPE_WEBHOOK_SECRET`
-   - `STRIPE_START_PRICE_ID`
-   - `STRIPE_SCALE_PRICE_ID`
-   - `STRIPE_ENTERPRISE_PRICE_ID`
-   - `OPENROUTER_API_KEY`
-   - `NEXT_PUBLIC_BASE_URL` (set to your Vercel domain, e.g., https://your-app.vercel.app)
-   - `NEXT_PUBLIC_APP_URL` (same as above)
-   - `NEXT_PUBLIC_APP_NAME`
+   - `NEXT_PUBLIC_STRIPE_START_PRICE_ID`
+   - `NEXT_PUBLIC_STRIPE_SCALE_PRICE_ID`
+   - `NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID`
+   - `NEXT_PUBLIC_POSTHOG_KEY`
+   - `NEXT_PUBLIC_POSTHOG_HOST`
 4. Click **Deploy**
 
-> ⚠️ **Important**: Add the same environment variables to Vercel that you used locally. Without them, your app won't work!
+> ⚠️ Make sure all `NEXT_PUBLIC_*` variables are added — these are required at build time for Next.js.
 
 ## 📝 License
 

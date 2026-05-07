@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import { trackEvent } from '@/lib/analytics/events'
 
 export function FinalCTA() {
   return (
@@ -76,6 +77,12 @@ export function FinalCTA() {
           className="flex flex-col sm:flex-row items-center gap-4 w-full sm:w-auto"
         >
           <button
+            onClick={() =>
+              trackEvent('cta_click', {
+                cta: 'final_cta',
+                destination: '/signup',
+              })
+            }
             className="h-12 px-8 rounded-full text-sm font-medium transition-all duration-150 flex items-center justify-center gap-2 w-full sm:w-auto"
             style={{
               backgroundColor: '#ffffff',
