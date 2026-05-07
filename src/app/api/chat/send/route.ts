@@ -174,6 +174,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid response from AI provider' }, { status: 500 })
     }
 
+    // 5b. Decrement units — non-blocking; log errors but never block the 200 response
+    try {
+      const supabase = await createClient()
+      const { error: rpcError } = await supabase.rpc('decrement_units')
+      if (rpcError) {
+        // Log but do not block — a reconciliation job can catch missed decrements
+        console.error('[chat/send] Decrement RPC error:', rpcError)
+      }
+    } catch (decrementErr) {
+      console.error('[chat/send] Decrement RPC error:', decrementErr)
+    }
+
     return NextResponse.json({
       text,
       model: OPENROUTER_MODEL,
