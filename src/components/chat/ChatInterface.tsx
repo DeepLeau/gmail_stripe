@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, type FormEvent } from 'react'
 import type { ChatMessage } from '@/lib/chat/types'
 import type { SubscriptionData } from '@/lib/stripe/config'
-import { sendChatMessage } from '@/lib/chat/mockApi'
+import { sendMessage } from '@/lib/chat/api'
 import { ChatMessageBubble } from './ChatMessage'
 import { TypingIndicator } from './TypingIndicator'
 import { ChatInput } from './ChatInput'
@@ -54,7 +54,16 @@ export function ChatInterface({ subscription }: ChatInterfaceProps) {
 
     setIsLoading(true)
     try {
-      const response = await sendChatMessage(trimmed)
+      // Historique : exclure les messages en attente (pending/loading),
+      // mapper 'ai' → 'assistant' pour l'API
+      const history = messages
+        .filter((msg) => msg.role === 'user' || msg.role === 'ai')
+        .map((msg) => ({
+          role: (msg.role === 'ai' ? 'assistant' : msg.role) as 'user' | 'assistant',
+          content: msg.content,
+        }))
+
+      const response = await sendMessage(trimmed, history)
       if (response.limitReached) {
         setLimitReachedBanner(true)
         return
