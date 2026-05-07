@@ -218,6 +218,18 @@ export function useSignupWithStripeLinking(
       return { ok: false, error: msg }
     }
 
+    // ── Envoi fire-and-forget de l'email de bienvenue ──────────────────
+    // Placé STRICTEMENT après le check d'erreur (lignes 214-218 ci-dessus).
+    // Ne bloque jamais la redirection — les erreurs sont loggées côté client
+    // mais ne re-throw pas et n'affectent pas le return ni finalizeAfterSignup().
+    fetch('/api/email/welcome', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: email.trim() }),
+    }).catch((e) => {
+      console.warn('[useSignupWithStripeLinking] Welcome email failed:', e)
+    })
+
     return finalizeAfterSignup()
   }
 

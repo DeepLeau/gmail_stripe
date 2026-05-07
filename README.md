@@ -4,9 +4,10 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 
 ## ✨ Features
 
-- **Email Intelligence** — AI-powered email analysis and memory across conversations
-- **Multi-Model AI** — Powered by OpenRouter supporting Anthropic, OpenAI, Google, and more
+- **Welcome Email Automation** — Sends personalized welcome emails to new users via Resend
+- **Stripe Integration** — Handles signup and payment linking through Stripe
 - **Analytics Integration** — PostHog for product analytics with GDPR-friendly EU hosting
+- **Supabase Backend** — Auth and database powered by Supabase
 
 ## 🛠️ Tech Stack
 
@@ -14,8 +15,8 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Auth & Database**: Supabase
-- **Payments**: Stripe (subscriptions)
-- **AI Integration**: OpenRouter API
+- **Payments**: Stripe
+- **Email**: Resend
 - **Analytics**: PostHog
 
 ## 🚀 Quick Start
@@ -29,8 +30,8 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/gmail_stripe.git
-cd gmail_stripe
+git clone https://github.com/YOUR_USERNAME/emind.git
+cd emind
 ```
 
 **Where is my terminal?**
@@ -49,21 +50,7 @@ npm install
 
 Create a file named `.env.local` in the root of your project (same folder as `package.json`). This file stores sensitive configuration like API keys — it never gets committed to GitHub.
 
-Copy the template from `.env.example` and fill in each value:
-
-```bash
-# ─────────────────────────────────────────
-# SUPABASE
-# ─────────────────────────────────────────
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-
-# ─────────────────────────────────────────
-# POSTHOG ANALYTICS
-# ─────────────────────────────────────────
-NEXT_PUBLIC_POSTHOG_KEY=phc_YOUR_PROJECT_KEY_HERE
-NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
-```
+Copy the content from `.env.example` and fill in each value.
 
 ### 4. Run the development server
 
@@ -82,39 +69,57 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 | `NEXT_PUBLIC_SUPABASE_URL` | Yes | Supabase Dashboard > Project Settings > API > Project URL | Your Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Public key for Supabase client |
 | `NEXT_PUBLIC_POSTHOG_KEY` | Yes | PostHog Dashboard > Project Settings > Project API Key | Your PostHog project API key |
-| `NEXT_PUBLIC_POSTHOG_HOST` | No | Leave as `https://eu.i.posthog.com` for EU hosting (GDPR-friendly) | PostHog server host URL |
+| `NEXT_PUBLIC_POSTHOG_HOST` | No | Leave as `https://eu.i.posthog.com` for EU hosting | PostHog server host URL |
+| `RESEND_API_KEY` | Yes | Resend Dashboard > API Keys > Create API Key | Your Resend API key |
+| `RESEND_FROM_EMAIL` | Yes | Must be a verified domain in Resend Dashboard > Domains | Sender email address |
 
-**Finding Supabase credentials:**
+**Finding your Supabase keys:**
+
 1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
 2. Select your project
 3. Click **Project Settings** (gear icon)
-4. Navigate to **API**
-5. Copy **Project URL** for `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy **anon/public** key for `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Click **API** in the sidebar
+5. Copy **Project URL** → `NEXT_PUBLIC_SUPABASE_URL`
+6. Copy **anon/public** key → `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-**Finding PostHog credentials:**
-1. Go to [eu.posthog.com](https://eu.posthog.com) (or us.posthog.com for US)
-2. Select your project
-3. Click **Project Settings**
-4. Find **Project API Key** and copy it for `NEXT_PUBLIC_POSTHOG_KEY`
+**Finding your Resend API key:**
+
+1. Go to [Resend Dashboard](https://resend.com/api-keys)
+2. Click **Create API Key**
+3. Give it a name (e.g., "Emind Development")
+4. Copy the key → `RESEND_API_KEY`
+5. To verify a sending domain: go to Resend Dashboard > **Domains** > add your domain and follow DNS verification steps
+6. Set `RESEND_FROM_EMAIL` to an address using your verified domain (e.g., `hello@yourdomain.com`)
+
+> 💡 **Development tip**: Without a verified domain, you can use `onboarding@resend.dev` as `RESEND_FROM_EMAIL` — emails will only go to your Resend account owner.
 
 ## 📁 Project Structure
 
-- `src/app` — Next.js App Router layout and page structure
-- `src/components/providers` — PostHog analytics provider components
+- **src/app/api/email/welcome/** — API route that sends welcome emails to new users
+- **src/components/email/** — React email components (WelcomeEmail)
+- **src/lib/resend.ts** — Resend client configuration
+- **src/lib/stripe/hooks/** — Stripe signup linking hooks
+- **src/app/** — Next.js App Router pages and layouts
+- **.env.example** — Template with all required environment variables
 
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
+**Step by step:**
+
 1. Click the button above or go to [vercel.com/new](https://vercel.com/new)
 2. Import your GitHub repository
-3. Add all environment variables in Vercel dashboard:
-   - Go to **Settings** > **Environment Variables**
-   - Add each variable from `.env.example`
+3. In **Environment Variables**, add each variable from your `.env.local` file:
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_POSTHOG_KEY`
+   - `NEXT_PUBLIC_POSTHOG_HOST`
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
 4. Click **Deploy**
 
-> ⚠️ Important: Make sure to add all environment variables before deploying, especially `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+> ⚠️ Don't forget to add all environment variables in Vercel — your app won't work without them!
 
 ## 📝 License
 
