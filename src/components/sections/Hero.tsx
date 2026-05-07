@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Mail, Search, MessageCircle, Zap, Shield } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import posthog from 'posthog-js'
 
 // Chat mock data for the hero
 const chatMessages = [
@@ -232,6 +233,9 @@ export function Hero() {
               <a
                 href="#"
                 className="btn-hero-primary"
+                onClick={() =>
+                  posthog.capture('cta_click', { location: 'hero', cta_label: 'Connecter ma boîte mail' })
+                }
               >
                 Connecter ma boîte mail
                 <ArrowRight size={16} strokeWidth={1.5} />
@@ -239,6 +243,9 @@ export function Hero() {
               <a
                 href="#examples"
                 className="btn-hero-ghost"
+                onClick={() =>
+                  posthog.capture('cta_click', { location: 'hero', cta_label: 'Voir une démo' })
+                }
               >
                 Voir une démo
                 <ArrowRight size={16} strokeWidth={1.5} />

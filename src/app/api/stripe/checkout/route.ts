@@ -35,7 +35,6 @@ export async function POST(request: NextRequest) {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'
   const priceId = getPriceId(planParam)
 
-  // même sans email pré-fourni. Stripe collecte l'email pendant le Checkout.
   const session = await stripe.checkout.sessions.create({
     mode: 'subscription',
     payment_method_types: ['card'],

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { useSignupWithStripeLinking } from '@/lib/stripe/hooks/useSignupWithStripeLinking'
+import posthog from 'posthog-js'
 
 type SignupFormState = {
   status: 'idle' | 'loading' | 'error' | 'password_mismatch'
@@ -87,6 +88,7 @@ export function SignupForm() {
       return
     }
 
+    posthog.capture('signup_submitted', { method: 'email' })
     router.push('/chat')
   }
 

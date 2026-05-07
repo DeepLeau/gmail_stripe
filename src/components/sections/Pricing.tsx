@@ -2,6 +2,7 @@
 
 import { motion, type Variants } from 'framer-motion'
 import { Check, X } from 'lucide-react'
+import posthog from 'posthog-js'
 
 const STRIPE_PRICE_IDS: Record<string, string> = {
   start: process.env.NEXT_PUBLIC_STRIPE_START_PRICE_ID ?? 'price_start',
@@ -96,6 +97,8 @@ const cardVariants: Variants = {
 
 export function Pricing() {
   async function handleCheckout(planId: string) {
+    posthog.capture('checkout_initiated', { plan: planId })
+
     try {
       const res = await fetch('/api/stripe/checkout', {
         method: 'POST',

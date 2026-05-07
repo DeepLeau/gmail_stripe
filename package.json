@@ -17,6 +17,8 @@
     "framer-motion": "latest",
     "lucide-react": "latest",
     "next": "latest",
+    "posthog-js": "^1.372.9",
+    "posthog-node": "^5.33.3",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "stripe": "^22.1.0",

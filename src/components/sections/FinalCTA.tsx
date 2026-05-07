@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
+import posthog from 'posthog-js'
 
 export function FinalCTA() {
   return (
@@ -82,6 +83,12 @@ export function FinalCTA() {
               color: 'var(--accent)',
               boxShadow: '0 4px 20px rgba(0,0,0,0.15)',
             }}
+            onClick={() =>
+              posthog.capture('cta_click', {
+                location: 'final_cta',
+                cta_label: 'Essayer Emind gratuitement',
+              })
+            }
             onMouseEnter={(e) => {
               ;(e.currentTarget as HTMLButtonElement).style.transform =
                 'translateY(-2px)'
