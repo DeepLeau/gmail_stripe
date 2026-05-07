@@ -7,6 +7,8 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Email Intelligence** — AI-powered email analysis and memory across conversations
 - **Multi-Model AI** — Powered by OpenRouter supporting Anthropic, OpenAI, Google, and more
 - **Analytics Integration** — PostHog for product analytics with GDPR-friendly EU hosting
+- **Stripe Integration** — Seamless signup and subscription management via Stripe
+- **Transactional Email** — Welcome emails and notifications via Resend
 
 ## 🛠️ Tech Stack
 
@@ -17,6 +19,7 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 - **Payments**: Stripe (subscriptions)
 - **AI Integration**: OpenRouter API
 - **Analytics**: PostHog
+- **Email**: Resend
 
 ## 🚀 Quick Start
 
@@ -29,8 +32,8 @@ Emind connects your inbox to an AI that reads, understands, and remembers your e
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/gmail_stripe.git
-cd gmail_stripe
+git clone https://github.com/YOUR_USERNAME/REPO_NAME.git
+cd REPO_NAME
 ```
 
 **Where is my terminal?**
@@ -63,6 +66,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 # ─────────────────────────────────────────
 NEXT_PUBLIC_POSTHOG_KEY=phc_YOUR_PROJECT_KEY_HERE
 NEXT_PUBLIC_POSTHOG_HOST=https://eu.i.posthog.com
+
+# ─────────────────────────────────────────
+# RESEND — Transactional Email
+# ─────────────────────────────────────────
+RESEND_API_KEY=re_YOUR_API_KEY_HERE
+RESEND_FROM_EMAIL=hello@yourdomain.com
 ```
 
 ### 4. Run the development server
@@ -83,38 +92,58 @@ Then open [http://localhost:3000](http://localhost:3000) in your browser.
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Yes | Supabase Dashboard > Project Settings > API > anon/public key | Public key for Supabase client |
 | `NEXT_PUBLIC_POSTHOG_KEY` | Yes | PostHog Dashboard > Project Settings > Project API Key | Your PostHog project API key |
 | `NEXT_PUBLIC_POSTHOG_HOST` | No | Leave as `https://eu.i.posthog.com` for EU hosting (GDPR-friendly) | PostHog server host URL |
+| `RESEND_API_KEY` | Yes | [Resend API Keys](https://resend.com/api-keys) > Create key with "Sending access" permissions | API key for sending transactional emails |
+| `RESEND_FROM_EMAIL` | Yes | Must be a [verified domain](https://resend.com/domains) in Resend (or `onboarding@resend.dev` for dev testing) | Sender email address for outgoing emails |
 
-**Finding Supabase credentials:**
-1. Go to [Supabase Dashboard](https://supabase.com/dashboard)
+### Finding your Supabase credentials
+
+1. Go to [supabase.com](https://supabase.com) and sign in
 2. Select your project
 3. Click **Project Settings** (gear icon)
-4. Navigate to **API**
-5. Copy **Project URL** for `NEXT_PUBLIC_SUPABASE_URL`
-6. Copy **anon/public** key for `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+4. Click **API** in the sidebar
+5. Copy **Project URL** → paste as `NEXT_PUBLIC_SUPABASE_URL`
+6. Copy **anon/public** key → paste as `NEXT_PUBLIC_SUPABASE_ANON_KEY`
 
-**Finding PostHog credentials:**
-1. Go to [eu.posthog.com](https://eu.posthog.com) (or us.posthog.com for US)
-2. Select your project
-3. Click **Project Settings**
-4. Find **Project API Key** and copy it for `NEXT_PUBLIC_POSTHOG_KEY`
+### Setting up Resend
+
+1. Sign up at [resend.com](https://resend.com)
+2. Go to [API Keys](https://resend.com/api-keys) and create a new key with "Sending access" permissions
+3. To send emails from your own domain (recommended for production):
+   - Go to [Domains](https://resend.com/domains) > Add Domain
+   - Add the DNS records shown (SPF, DKIM, DMARC)
+   - Wait for verification (usually a few minutes)
+4. Copy your API key → paste as `RESEND_API_KEY`
+5. Set `RESEND_FROM_EMAIL` to your verified domain address (e.g., `hello@yourdomain.com`)
+
+> ⚠️ **Dev mode**: Without domain verification, emails only go to the Resend account owner and only from `onboarding@resend.dev`. For testing, use `RESEND_FROM_EMAIL=onboarding@resend.dev`.
 
 ## 📁 Project Structure
 
-- `src/app` — Next.js App Router layout and page structure
-- `src/components/providers` — PostHog analytics provider components
+- `src/components/auth` — Authentication UI components including the signup form
+- `src/lib/email` — Email utilities and templates (Resend integration)
+- `src/lib/stripe/hooks` — Stripe signup linking and subscription management
 
 ## 🚀 Deploy to Vercel
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new)
 
+### Step by step
+
 1. Click the button above or go to [vercel.com/new](https://vercel.com/new)
 2. Import your GitHub repository
-3. Add all environment variables in Vercel dashboard:
-   - Go to **Settings** > **Environment Variables**
-   - Add each variable from `.env.example`
-4. Click **Deploy**
+3. In the Vercel dashboard, go to **Settings** > **Environment Variables**
+4. Add all variables from your `.env.local` file:
 
-> ⚠️ Important: Make sure to add all environment variables before deploying, especially `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `NEXT_PUBLIC_POSTHOG_KEY`
+   - `NEXT_PUBLIC_POSTHOG_HOST`
+   - `RESEND_API_KEY`
+   - `RESEND_FROM_EMAIL`
+
+5. Click **Deploy**
+
+Your app will be live at `https://your-project.vercel.app`.
 
 ## 📝 License
 

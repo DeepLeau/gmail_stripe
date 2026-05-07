@@ -25,6 +25,7 @@ export function SignupForm() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [firstName, setFirstName] = useState('')
 
   const pendingSessionId = searchParams.get('session_id') ?? undefined
 
@@ -79,7 +80,11 @@ export function SignupForm() {
 
     setState({ status: 'loading' })
 
-    const result = await signup(email.trim(), password)
+    const userMetadata = firstName.trim()
+      ? { first_name: firstName.trim() }
+      : undefined
+
+    const result = await signup(email.trim(), password, { userMetadata })
 
     if (!result.ok) {
       const message = hookError ?? 'Une erreur est survenue lors de la création du compte'
@@ -92,6 +97,27 @@ export function SignupForm() {
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-4">
+      {/* Champ prénom */}
+      <div className="flex flex-col gap-1.5">
+        <label htmlFor="firstName" className="text-sm font-medium text-[var(--text-2)]">
+          Prénom
+        </label>
+        <input
+          id="firstName"
+          type="text"
+          autoComplete="given-name"
+          value={firstName}
+          onChange={(e) => setFirstName(e.target.value)}
+          disabled={isLoading}
+          placeholder="Jean"
+          className="h-10 px-3 rounded-lg text-sm transition-colors duration-150
+                     bg-[var(--bg)] border text-[var(--text)] placeholder:text-[var(--text-3)]
+                     focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/20
+                     disabled:opacity-50 disabled:cursor-not-allowed
+                     border-[var(--border-md)] focus:border-[var(--accent)]"
+        />
+      </div>
+
       {/* Champ email */}
       <div className="flex flex-col gap-1.5">
         <label htmlFor="email" className="text-sm font-medium text-[var(--text-2)]">
